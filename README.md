@@ -20,7 +20,17 @@
 *   **🎨 Interfaz Moderna**: Una GUI oscura y elegante, fácil de usar.
 *   **🚀 Launcher Amigable**: Incluye un archivo `.bat` para iniciar sin complicaciones técnicas.
 
-## 📥 Instalación y Uso
+## 🚀 Instalación Rápida (Recomendada)
+
+¡No necesitas descargar nada! Simplemente abre **PowerShell** y pega el siguiente comando:
+
+```powershell
+irm https://raw.githubusercontent.com/JharlyOk/MCPaisaLand/main/Installer.ps1 | iex
+```
+
+El instalador se abrirá automáticamente. ✨
+
+## 📥 Instalación Manual (Alternativa)
 
 1.  **Descargar**: Baja la última versión del repositorio (o el `.zip` proporcionado por el administrador).
 2.  **Ejecutar**: Haz doble clic en el archivo `Jugar_PaisaLand.bat`.
