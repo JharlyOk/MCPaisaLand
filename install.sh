@@ -5,9 +5,13 @@
 # ==============================================================================================
 
 # --- CONFIGURACIÓN ---
-# ¡IMPORTANTE! REEMPLAZA ESTOS LINKS POR LOS TUYOS
+# ¡IMPORTANTE! REEMPLAZA ESTOS LINKS POR LOS TUYOS DE DROPBOX
 URL_LOW="URL_GAMA_BAJA_AQUI"
 URL_HIGH="URL_GAMA_ALTA_AQUI"
+
+# Auto-corregir links de Dropbox (dl=0 -> dl=1)
+URL_LOW=${URL_LOW//dl=0/dl=1}
+URL_HIGH=${URL_HIGH//dl=0/dl=1}
 MINECRAFT_DIR="$HOME/.minecraft"
 TEMP_DIR="/tmp/PaisaLand_Installer"
 

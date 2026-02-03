@@ -7,9 +7,10 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 # --- CONFIGURACIÓN ---
-# ¡IMPORTANTE! REEMPLAZA ESTOS LINKS POR LOS TUYOS DE DROPBOX/DRIVE
-$DownloadUrlLow = "URL_GAMA_BAJA_AQUI" 
-$DownloadUrlHigh = "URL_GAMA_ALTA_AQUI"
+# ¡IMPORTANTE! REEMPLAZA ESTOS LINKS POR LOS TUYOS DE DROPBOX
+# Si terminan en dl=0, el script lo arreglará automáticamente.
+$DownloadUrlLow = "URL_GAMA_BAJA_AQUI".Replace("dl=0", "dl=1")
+$DownloadUrlHigh = "URL_GAMA_ALTA_AQUI".Replace("dl=0", "dl=1")
 $InstallerTitle = "PaisaLand - Instalador Oficial de Mods"
 $MinecraftPath = "$env:APPDATA\.minecraft"
 $TempDir = "$env:TEMP\PaisaLandInstaller"
