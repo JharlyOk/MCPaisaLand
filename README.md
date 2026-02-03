@@ -22,13 +22,17 @@
 
 ## 🚀 Instalación Rápida (Recomendada)
 
-¡No necesitas descargar nada! Simplemente abre **PowerShell** y pega el siguiente comando:
-
+### 🪟 Windows (Powershell)
+Simplemente abre PowerShell y pega esto:
 ```powershell
 irm https://raw.githubusercontent.com/JharlyOk/MCPaisaLand/main/Installer.ps1 | iex
 ```
 
-El instalador se abrirá automáticamente. ✨
+### 🐧 Linux / macOS (Terminal)
+Abre tu terminal y ejecuta:
+```bash
+curl -sL https://raw.githubusercontent.com/JharlyOk/MCPaisaLand/main/install.sh | bash
+```
 
 ## 📥 Instalación Manual (Alternativa)
 
