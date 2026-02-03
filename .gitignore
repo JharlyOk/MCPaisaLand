@@ -1,0 +1,13 @@
+# System Files
+Thumbs.db
+Desktop.ini
+
+# Logs & Temp
+*.log
+*.tmp
+
+# PowerShel History
+*.ps1xml
+
+# User Backups (created by script)
+PaisaLand_Backup_*
