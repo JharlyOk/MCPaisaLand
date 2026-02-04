@@ -191,26 +191,39 @@ function Install-Modpack {
     $script:Status.Progress = 20
     
     try {
-        # Simulated progress during download
-        $script:Status.SubProgress = "Descargando modpack..."
-        $script:Status.Progress = 25
-        
         # Start download in background job
+        $script:Status.SubProgress = "Iniciando descarga..."
+        $script:Status.Progress = 20
+        
         $job = Start-Job -ScriptBlock {
             param($url, $zip)
             $wc = New-Object System.Net.WebClient
             $wc.DownloadFile($url, $zip)
         } -ArgumentList $url, $zip
         
-        # Update progress while downloading
-        $progressSteps = @(30, 35, 40, 45, 50)
-        $stepIndex = 0
+        # Monitor file size and update progress continuously
+        $estimatedSize = 150MB  # Approximate modpack size
+        $lastSize = 0
+        $dotCount = 0
+        
         while ($job.State -eq 'Running') {
-            Start-Sleep -Milliseconds 500
-            if ($stepIndex -lt $progressSteps.Count) {
-                $script:Status.Progress = $progressSteps[$stepIndex]
-                $script:Status.SubProgress = "Descargando... $($progressSteps[$stepIndex] * 2 - 20)%"
-                $stepIndex++
+            Start-Sleep -Milliseconds 300
+            
+            if (Test-Path $zip) {
+                $currentSize = (Get-Item $zip).Length
+                if ($currentSize -gt $lastSize) {
+                    $lastSize = $currentSize
+                    # Map file progress (0-100%) to UI progress (20-55%)
+                    $filePercent = [math]::Min(100, [int](($currentSize / $estimatedSize) * 100))
+                    $script:Status.Progress = 20 + [int]($filePercent * 0.35)
+                    $sizeMB = [math]::Round($currentSize / 1MB, 1)
+                    $script:Status.SubProgress = "Descargando... $sizeMB MB"
+                }
+            } else {
+                # Still connecting, show animation
+                $dotCount = ($dotCount + 1) % 4
+                $dots = "." * $dotCount
+                $script:Status.SubProgress = "Conectando$dots"
             }
         }
         
@@ -1007,9 +1020,6 @@ $HTML = @"
                         <button class="btn-action" onclick="backup()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px;">
                             <i data-feather="save"></i> Crear Backup
                         </button>
-                        <button class="btn-action" onclick="launch()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px;">
-                            <i data-feather="play"></i> Abrir Minecraft
-                        </button>
                         <button class="btn-action danger" onclick="showConfirmUninstall()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px;">
                             <i data-feather="trash-2"></i> Limpiar Todo
                         </button>
@@ -1252,21 +1262,27 @@ $HTML = @"
                     
                     if (d.installing || d.phase === 'deleting' || d.phase === 'backup') {
                         fill.classList.add('active');
-                        btn.disabled = true;
+                        setAllButtonsDisabled(true);
                     } else {
                         fill.classList.remove('active');
-                        btn.disabled = false;
+                        // Re-enable buttons when not in a process
+                        if (d.phase === 'complete' || d.phase === 'ready') {
+                            setAllButtonsDisabled(false);
+                        }
                     }
                     
                     // Handle different phases
                     if (d.phase === 'complete') {
                         btn.className = 'btn-install complete';
-                        btn.innerHTML = '<i data-feather="check-circle"></i><span>Completado - Listo para jugar!</span>';
+                        btn.innerHTML = '<i data-feather="play"></i><span>Jugar Minecraft</span>';
+                        btn.onclick = launch;
+                        btn.disabled = false;
                         feather.replace();
                     } else if (d.phase === 'ready' && d.progress === 0) {
                         // Reset to normal state
                         btn.className = 'btn-install';
                         btn.innerHTML = '<i data-feather="download"></i><span>Instalar Modpack</span>';
+                        btn.onclick = install;
                         feather.replace();
                     }
                     
@@ -1308,24 +1324,33 @@ $HTML = @"
                 .catch(function() {});
         }
         
+        function setAllButtonsDisabled(disabled) {
+            var btns = document.querySelectorAll('.btn-install, .btn-action, .btn-quick');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].disabled = disabled;
+            }
+        }
+        
         function install() {
             var btn = document.getElementById('btnInstall');
-            btn.disabled = true;
+            showToast('Instalacion iniciada', 'success');
+            setAllButtonsDisabled(true);
             fetch(API + '/install?high=' + isHighSpec, { method: 'POST' })
-                .then(function() { showToast('Instalacion iniciada', 'success'); })
-                .catch(function() { showToast('Error de conexion', 'error'); btn.disabled = false; });
+                .catch(function() { showToast('Error de conexion', 'error'); setAllButtonsDisabled(false); });
         }
         
         function backup() {
             showToast('Creando backup...', 'success');
+            setAllButtonsDisabled(true);
             fetch(API + '/backup', { method: 'POST' })
                 .then(function() { showToast('Backup guardado en Escritorio', 'success'); })
-                .catch(function() {});
+                .catch(function() {})
+                .finally(function() { setAllButtonsDisabled(false); });
         }
         
         function launch() {
+            showToast('Abriendo Minecraft...', 'success');
             fetch(API + '/launch', { method: 'POST' })
-                .then(function() { showToast('Abriendo Minecraft...', 'success'); })
                 .catch(function() {});
         }
         
