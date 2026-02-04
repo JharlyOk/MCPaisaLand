@@ -1325,18 +1325,32 @@ $HTML = @"
         }
         
         function setAllButtonsDisabled(disabled) {
-            var btns = document.querySelectorAll('.btn-install, .btn-action, .btn-quick');
+            // Disable all buttons
+            var btns = document.querySelectorAll('.btn-install, .btn-action, button');
             for (var i = 0; i < btns.length; i++) {
                 btns[i].disabled = disabled;
+            }
+            // Disable version cards
+            var cards = document.querySelectorAll('.version-card');
+            for (var j = 0; j < cards.length; j++) {
+                cards[j].style.pointerEvents = disabled ? 'none' : 'auto';
+                cards[j].style.opacity = disabled ? '0.5' : '1';
             }
         }
         
         function install() {
             var btn = document.getElementById('btnInstall');
+            btn.innerHTML = '<i data-feather="loader"></i><span>Instalando, espere...</span>';
+            feather.replace();
             showToast('Instalacion iniciada', 'success');
             setAllButtonsDisabled(true);
             fetch(API + '/install?high=' + isHighSpec, { method: 'POST' })
-                .catch(function() { showToast('Error de conexion', 'error'); setAllButtonsDisabled(false); });
+                .catch(function() { 
+                    showToast('Error de conexion', 'error'); 
+                    setAllButtonsDisabled(false);
+                    btn.innerHTML = '<i data-feather="download"></i><span>Instalar Modpack</span>';
+                    feather.replace();
+                });
         }
         
         function backup() {
