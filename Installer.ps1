@@ -1378,9 +1378,12 @@ $HTML = @"
         
         function confirmUninstall() {
             closeConfirm();
+            showToast('Limpiando instalacion...', 'success');
+            setAllButtonsDisabled(true);
             fetch(API + '/uninstall', { method: 'POST' })
                 .then(function() { showToast('Limpieza completada', 'success'); })
-                .catch(function() {});
+                .catch(function() {})
+                .finally(function() { setAllButtonsDisabled(false); });
         }
         
         // Fast polling - 300ms
