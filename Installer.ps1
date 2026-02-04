@@ -73,191 +73,114 @@ function New-Backup {
 function Remove-Modpack { foreach ($item in $script:Config.ManagedFolders) { $p = "$($script:Config.MinecraftPath)\$item"; if (Test-Path $p) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue } } }
 function Clear-TempFiles { if (Test-Path $script:Config.TempDir) { Remove-Item $script:Config.TempDir -Recurse -Force -ErrorAction SilentlyContinue } }
 
-# ==================== XAML UI ====================
-[xml]$XAML = @"
+# ==================== THEME COLORS ====================
+$script:Themes = @{
+    Dark = @{
+        Bg = "#2D2D30"; Card = "#1E1E1E"; Text = "#FFFFFF"; SubText = "#888888"; Border = "#404040"; Accent = "#4CAF50"
+    }
+    Light = @{
+        Bg = "#FFFFFF"; Card = "#F5F5F5"; Text = "#1A1A1A"; SubText = "#666666"; Border = "#E0E0E0"; Accent = "#4CAF50"
+    }
+}
+
+# ==================== BUILD XAML FUNCTION ====================
+function Get-InstallerXAML {
+    param([bool]$Dark = $true)
+    $t = if ($Dark) { $script:Themes.Dark } else { $script:Themes.Light }
+    
+    return @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="PaisaLand Installer" Height="520" Width="480"
         WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen">
-    <Window.Resources>
-        <!-- DARK THEME (Default) -->
-        <Color x:Key="BgColor">#2D2D30</Color>
-        <Color x:Key="CardColor">#1E1E1E</Color>
-        <Color x:Key="TextColor">#FFFFFF</Color>
-        <Color x:Key="SubTextColor">#888888</Color>
-        <Color x:Key="BorderColor">#404040</Color>
-        <Color x:Key="AccentColor">#4CAF50</Color>
-        
-        <SolidColorBrush x:Key="BgBrush" Color="{DynamicResource BgColor}"/>
-        <SolidColorBrush x:Key="CardBrush" Color="{DynamicResource CardColor}"/>
-        <SolidColorBrush x:Key="TextBrush" Color="{DynamicResource TextColor}"/>
-        <SolidColorBrush x:Key="SubTextBrush" Color="{DynamicResource SubTextColor}"/>
-        <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}"/>
-        <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
-        
-        <!-- ICON BUTTON -->
-        <Style x:Key="IconBtn" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource SubTextBrush}"/>
-            <Setter Property="Width" Value="36"/><Setter Property="Height" Value="36"/><Setter Property="FontSize" Value="16"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-                <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="4">
-                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-                <ControlTemplate.Triggers>
-                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="#44FFFFFF"/></Trigger>
-                </ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-        
-        <!-- CLOSE BUTTON -->
-        <Style x:Key="CloseBtn" TargetType="Button" BasedOn="{StaticResource IconBtn}">
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-                <Border x:Name="Bd" Background="Transparent" CornerRadius="4">
-                    <TextBlock Text="✕" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}" FontWeight="Bold"/>
-                </Border>
-                <ControlTemplate.Triggers>
-                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="#E53935"/></Trigger>
-                </ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-        
-        <!-- TOGGLE SWITCH -->
-        <Style x:Key="ToggleSwitch" TargetType="CheckBox">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
-                <Grid>
-                    <Border x:Name="Track" Width="50" Height="26" CornerRadius="13" Background="#555555"/>
-                    <Border x:Name="Thumb" Width="22" Height="22" CornerRadius="11" Background="White" HorizontalAlignment="Left" Margin="2,0,0,0">
-                        <Border.RenderTransform><TranslateTransform x:Name="ThumbTranslate" X="0"/></Border.RenderTransform>
-                    </Border>
-                </Grid>
-                <ControlTemplate.Triggers>
-                    <Trigger Property="IsChecked" Value="True">
-                        <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}"/>
-                        <Setter TargetName="ThumbTranslate" Property="X" Value="24"/>
-                    </Trigger>
-                </ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-        
-        <!-- PRIMARY BUTTON -->
-        <Style x:Key="PrimaryBtn" TargetType="Button">
-            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/><Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="14"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-                <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="24,12">
-                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-                <ControlTemplate.Triggers>
-                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="#66BB6A"/></Trigger>
-                    <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Background" Value="#555"/><Setter Property="Foreground" Value="#888"/></Trigger>
-                </ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-        
-        <!-- SECONDARY BUTTON -->
-        <Style x:Key="SecondaryBtn" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource SubTextBrush}"/>
-            <Setter Property="FontSize" Value="12"/><Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-                <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="4" Padding="12,8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-                <ControlTemplate.Triggers>
-                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="#22FFFFFF"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/></Trigger>
-                </ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-        
-        <!-- EXPANDER -->
-        <Style x:Key="ExpanderStyle" TargetType="Expander">
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Expander">
-                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
-                    <StackPanel>
-                        <ToggleButton x:Name="HeaderSite" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" Cursor="Hand"
-                                      Background="Transparent" BorderThickness="0" Padding="0,15">
-                            <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
-                                <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
-                                    <Grid>
-                                        <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="Arrow" Text="▼" HorizontalAlignment="Right" Foreground="{DynamicResource SubTextBrush}" FontSize="10">
-                                            <TextBlock.RenderTransform><RotateTransform x:Name="ArrowRotate" Angle="0" CenterX="5" CenterY="5"/></TextBlock.RenderTransform>
-                                        </TextBlock>
-                                    </Grid>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsChecked" Value="True"><Setter TargetName="ArrowRotate" Property="Angle" Value="180"/></Trigger>
-                                    <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#11FFFFFF"/></Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate></ToggleButton.Template>
-                            <TextBlock Text="{TemplateBinding Header}" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
-                        </ToggleButton>
-                        <ContentPresenter x:Name="ExpandSite" Visibility="Collapsed"/>
-                    </StackPanel>
-                </Border>
-                <ControlTemplate.Triggers>
-                    <Trigger Property="IsExpanded" Value="True"><Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/></Trigger>
-                </ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-    </Window.Resources>
 
-    <Border CornerRadius="10" Background="{DynamicResource BgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+    <Border CornerRadius="10" Background="$($t.Bg)" BorderBrush="$($t.Border)" BorderThickness="1">
         <Border.Effect><DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="0" Opacity="0.5"/></Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="50"/>  <!-- Header -->
-                <RowDefinition Height="*"/>   <!-- Content -->
-                <RowDefinition Height="50"/>  <!-- Footer -->
+                <RowDefinition Height="50"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="50"/>
             </Grid.RowDefinitions>
 
             <!-- HEADER -->
             <Grid Grid.Row="0" Name="DragZone" Background="Transparent">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0,0,0">
                     <TextBlock Text="🎮" FontSize="20" VerticalAlignment="Center"/>
-                    <TextBlock Text=" PAISA" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
-                    <TextBlock Text="LAND" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                    <TextBlock Text=" PAISA" FontSize="16" FontWeight="Bold" Foreground="$($t.Text)" VerticalAlignment="Center"/>
+                    <TextBlock Text="LAND" FontSize="16" FontWeight="Bold" Foreground="$($t.Accent)" VerticalAlignment="Center"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,5,0">
-                    <Button Name="BtnTheme" Content="☀️" Style="{StaticResource IconBtn}" ToolTip="Cambiar Tema"/>
-                    <Button Name="BtnMinimize" Content="─" Style="{StaticResource IconBtn}"/>
-                    <Button Name="BtnClose" Style="{StaticResource CloseBtn}"/>
+                    <Button Name="BtnTheme" Content="$(if($Dark){'☀️'}else{'🌙'})" Width="36" Height="36" Background="Transparent" BorderThickness="0" Foreground="$($t.SubText)" FontSize="16" Cursor="Hand"/>
+                    <Button Name="BtnMinimize" Content="─" Width="36" Height="36" Background="Transparent" BorderThickness="0" Foreground="$($t.SubText)" FontSize="14" Cursor="Hand"/>
+                    <Button Name="BtnClose" Content="✕" Width="36" Height="36" Background="Transparent" BorderThickness="0" Foreground="$($t.SubText)" FontSize="14" FontWeight="Bold" Cursor="Hand"/>
                 </StackPanel>
             </Grid>
 
             <!-- CONTENT -->
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20,10">
                 <StackPanel>
-                    <!-- Main Toggle -->
-                    <Border Background="{DynamicResource CardBrush}" CornerRadius="8" Padding="20" Margin="0,0,0,15">
+                    <!-- Main Toggle Card -->
+                    <Border Background="$($t.Card)" CornerRadius="8" Padding="20" Margin="0,0,0,15">
                         <Grid>
                             <StackPanel>
-                                <TextBlock Text="Activar Gama Alta" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
-                                <TextBlock Text="Incluye Shaders, Texturas HD y efectos visuales avanzados." FontSize="12" Foreground="{DynamicResource SubTextBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="Activar Gama Alta" FontSize="16" FontWeight="SemiBold" Foreground="$($t.Text)"/>
+                                <TextBlock Text="Incluye Shaders, Texturas HD y efectos visuales avanzados." FontSize="12" Foreground="$($t.SubText)" Margin="0,8,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
-                            <CheckBox Name="ToggleHighSpec" Style="{StaticResource ToggleSwitch}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                            <CheckBox Name="ToggleHighSpec" HorizontalAlignment="Right" VerticalAlignment="Top" Cursor="Hand">
+                                <CheckBox.Template>
+                                    <ControlTemplate TargetType="CheckBox">
+                                        <Grid>
+                                            <Border x:Name="Track" Width="50" Height="26" CornerRadius="13" Background="#555555"/>
+                                            <Border x:Name="Thumb" Width="22" Height="22" CornerRadius="11" Background="White" HorizontalAlignment="Left" Margin="2,0,0,0">
+                                                <Border.RenderTransform><TranslateTransform x:Name="ThumbTranslate" X="0"/></Border.RenderTransform>
+                                            </Border>
+                                        </Grid>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Track" Property="Background" Value="$($t.Accent)"/>
+                                                <Setter TargetName="ThumbTranslate" Property="X" Value="24"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </CheckBox.Template>
+                            </CheckBox>
                         </Grid>
                     </Border>
                     
-                    <!-- Server Status -->
-                    <Border Background="{DynamicResource CardBrush}" CornerRadius="8" Padding="15" Margin="0,0,0,15">
+                    <!-- Server Status Card -->
+                    <Border Background="$($t.Card)" CornerRadius="8" Padding="15" Margin="0,0,0,15">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <Ellipse Name="ServerIndicator" Width="10" Height="10" Fill="#E53935"/>
-                                <TextBlock Name="ServerStatus" Text="Servidor: Verificando..." Foreground="{DynamicResource SubTextBrush}" FontSize="12" Margin="8,0,0,0"/>
+                                <TextBlock Name="ServerStatus" Text="Servidor: Verificando..." Foreground="$($t.SubText)" FontSize="12" Margin="8,0,0,0"/>
                             </StackPanel>
-                            <TextBlock Name="StatusText" Text="Listo para instalar" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,10,0,0"/>
-                            <ProgressBar Name="ProgressBar" Height="4" Background="#333" Foreground="{DynamicResource AccentBrush}" BorderThickness="0" Margin="0,10,0,0" Value="0"/>
+                            <TextBlock Name="StatusText" Text="Listo para instalar" Foreground="$($t.Text)" FontSize="14" Margin="0,10,0,0"/>
+                            <ProgressBar Name="ProgressBar" Height="4" Background="#333333" Foreground="$($t.Accent)" BorderThickness="0" Margin="0,10,0,0" Value="0"/>
                         </StackPanel>
                     </Border>
                     
                     <!-- Install Button -->
-                    <Button Name="BtnInstall" Content="⬇️  INSTALAR MODPACK" Style="{StaticResource PrimaryBtn}" HorizontalAlignment="Stretch"/>
+                    <Button Name="BtnInstall" Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd" Background="$($t.Accent)" CornerRadius="6" Padding="24,14">
+                                    <TextBlock Text="⬇️  INSTALAR MODPACK" FontSize="14" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="#66BB6A"/></Trigger>
+                                    <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Background" Value="#555555"/></Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
                     
                     <!-- Advanced Section -->
-                    <Expander Name="AdvancedExpander" Header="Opciones Avanzadas" Style="{StaticResource ExpanderStyle}" Margin="0,15,0,0">
+                    <Expander Name="AdvancedExpander" Margin="0,15,0,0" Foreground="$($t.Text)">
+                        <Expander.Header>
+                            <TextBlock Text="Opciones Avanzadas" FontWeight="SemiBold" Foreground="$($t.Text)"/>
+                        </Expander.Header>
                         <StackPanel Margin="0,10,0,0">
                             <Border Background="#0A0A0A" CornerRadius="6" Padding="10" Height="80" Margin="0,0,0,10">
                                 <ScrollViewer Name="LogScroller" VerticalScrollBarVisibility="Auto">
@@ -265,8 +188,8 @@ function Clear-TempFiles { if (Test-Path $script:Config.TempDir) { Remove-Item $
                                 </ScrollViewer>
                             </Border>
                             <StackPanel Orientation="Horizontal">
-                                <Button Name="BtnBackup" Content="📁 Backup" Style="{StaticResource SecondaryBtn}" Margin="0,0,10,0"/>
-                                <Button Name="BtnUninstall" Content="🗑️ Desinstalar" Style="{StaticResource SecondaryBtn}"/>
+                                <Button Name="BtnBackup" Content="📁 Backup" Background="Transparent" BorderBrush="$($t.Border)" BorderThickness="1" Foreground="$($t.SubText)" Padding="12,8" Cursor="Hand" Margin="0,0,10,0"/>
+                                <Button Name="BtnUninstall" Content="🗑️ Desinstalar" Background="Transparent" BorderBrush="#E53935" BorderThickness="1" Foreground="#E53935" Padding="12,8" Cursor="Hand"/>
                             </StackPanel>
                         </StackPanel>
                     </Expander>
@@ -274,124 +197,116 @@ function Clear-TempFiles { if (Test-Path $script:Config.TempDir) { Remove-Item $
             </ScrollViewer>
 
             <!-- FOOTER -->
-            <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="15,0">
+            <Border Grid.Row="2" BorderBrush="$($t.Border)" BorderThickness="0,1,0,0" Padding="15,0">
                 <Grid VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                        <TextBlock Text="💬" FontSize="14" Cursor="Hand" ToolTip="Discord" Margin="0,0,10,0"/>
-                        <TextBlock Text="🐙" FontSize="14" Cursor="Hand" ToolTip="GitHub"/>
-                    </StackPanel>
-                    <TextBlock Text="Powered by JharlyOk" Foreground="{DynamicResource SubTextBrush}" FontSize="11" HorizontalAlignment="Center"/>
-                    <TextBlock Name="VersionText" Text="v5.0.0" Foreground="{DynamicResource SubTextBrush}" FontSize="11" HorizontalAlignment="Right"/>
+                    <TextBlock Text="Powered by JharlyOk" Foreground="$($t.SubText)" FontSize="11" HorizontalAlignment="Center"/>
+                    <TextBlock Name="VersionText" Text="v5.0.0" Foreground="$($t.SubText)" FontSize="11" HorizontalAlignment="Right"/>
                 </Grid>
             </Border>
         </Grid>
     </Border>
 </Window>
 "@
-
-# ==================== CARGAR UI ====================
-$Reader = New-Object System.Xml.XmlNodeReader $XAML
-$Window = [Windows.Markup.XamlReader]::Load($Reader)
-
-$controls = @("DragZone","BtnTheme","BtnMinimize","BtnClose","ToggleHighSpec","ServerIndicator","ServerStatus","StatusText","ProgressBar","BtnInstall","AdvancedExpander","LogScroller","LogText","BtnBackup","BtnUninstall","VersionText")
-$UI = @{}; foreach ($n in $controls) { $c = $Window.FindName($n); if ($c) { $UI[$n] = $c } }
-
-# ==================== THEME SYSTEM ====================
-function Set-Theme {
-    param([bool]$Dark)
-    $script:IsDarkMode = $Dark
-    if ($Dark) {
-        $Window.Resources["BgColor"] = [System.Windows.Media.Color]::FromRgb(45, 45, 48)
-        $Window.Resources["CardColor"] = [System.Windows.Media.Color]::FromRgb(30, 30, 30)
-        $Window.Resources["TextColor"] = [System.Windows.Media.Color]::FromRgb(255, 255, 255)
-        $Window.Resources["SubTextColor"] = [System.Windows.Media.Color]::FromRgb(136, 136, 136)
-        $Window.Resources["BorderColor"] = [System.Windows.Media.Color]::FromRgb(64, 64, 64)
-        $UI.BtnTheme.Content = "☀️"
-    } else {
-        $Window.Resources["BgColor"] = [System.Windows.Media.Color]::FromRgb(255, 255, 255)
-        $Window.Resources["CardColor"] = [System.Windows.Media.Color]::FromRgb(245, 245, 245)
-        $Window.Resources["TextColor"] = [System.Windows.Media.Color]::FromRgb(26, 26, 26)
-        $Window.Resources["SubTextColor"] = [System.Windows.Media.Color]::FromRgb(102, 102, 102)
-        $Window.Resources["BorderColor"] = [System.Windows.Media.Color]::FromRgb(224, 224, 224)
-        $UI.BtnTheme.Content = "🌙"
-    }
-    Save-UserPreference -Key "DarkMode" -Value $Dark
 }
 
-# ==================== HELPERS ====================
-function Write-Log { param([string]$M); $UI.LogText.Text += "`n> $M"; $UI.LogScroller.ScrollToEnd(); [System.Windows.Forms.Application]::DoEvents() }
-function Update-Status { param([string]$M); $UI.StatusText.Text = $M; [System.Windows.Forms.Application]::DoEvents() }
-function Update-Progress { param([int]$V); $UI.ProgressBar.Value = $V; [System.Windows.Forms.Application]::DoEvents() }
-
-# ==================== INIT ====================
-function Initialize-Installer {
-    # Theme
-    $savedDark = Get-UserPreference -Key "DarkMode" -Default $true
-    Set-Theme -Dark $savedDark
+# ==================== CREATE AND SHOW WINDOW ====================
+function Show-Installer {
+    param([bool]$Dark = $true)
     
-    # High Spec Toggle
-    $savedHigh = Get-UserPreference -Key "HighSpec" -Default $false
-    $UI.ToggleHighSpec.IsChecked = $savedHigh
+    $xamlString = Get-InstallerXAML -Dark $Dark
+    [xml]$XAML = $xamlString
     
-    # Server
-    Write-Log "Verificando servidor..."
-    $s = Get-ServerStatus
-    if ($s.Online) { $UI.ServerIndicator.Fill = [System.Windows.Media.Brushes]::LimeGreen; $UI.ServerStatus.Text = "Servidor: $($s.Message)"; $UI.ServerStatus.Foreground = [System.Windows.Media.Brushes]::LimeGreen }
-    else { $UI.ServerIndicator.Fill = [System.Windows.Media.Brushes]::Red; $UI.ServerStatus.Text = "Servidor: $($s.Message)" }
+    $Reader = New-Object System.Xml.XmlNodeReader $XAML
+    $Window = [Windows.Markup.XamlReader]::Load($Reader)
     
-    $UI.VersionText.Text = "v$($script:Config.Version)"
-    Write-Log "Instalador listo."
+    # Map controls
+    $controls = @("DragZone","BtnTheme","BtnMinimize","BtnClose","ToggleHighSpec","ServerIndicator","ServerStatus","StatusText","ProgressBar","BtnInstall","AdvancedExpander","LogScroller","LogText","BtnBackup","BtnUninstall","VersionText")
+    $UI = @{}; foreach ($n in $controls) { $c = $Window.FindName($n); if ($c) { $UI[$n] = $c } }
+    
+    # Helpers
+    $WriteLog = { param($M); $UI.LogText.Text += "`n> $M"; $UI.LogScroller.ScrollToEnd(); [System.Windows.Forms.Application]::DoEvents() }
+    $UpdateStatus = { param($M); $UI.StatusText.Text = $M; [System.Windows.Forms.Application]::DoEvents() }
+    $UpdateProgress = { param($V); $UI.ProgressBar.Value = $V; [System.Windows.Forms.Application]::DoEvents() }
+    
+    # Events
+    $UI.DragZone.Add_MouseLeftButtonDown({ $Window.DragMove() })
+    $UI.BtnClose.Add_Click({ $Window.Close() })
+    $UI.BtnMinimize.Add_Click({ $Window.WindowState = "Minimized" })
+    
+    # Theme Toggle - Restart window with new theme
+    $UI.BtnTheme.Add_Click({
+        $newDark = -not $script:IsDarkMode
+        $script:IsDarkMode = $newDark
+        Save-UserPreference -Key "DarkMode" -Value $newDark
+        $Window.Close()
+        Show-Installer -Dark $newDark
+    }.GetNewClosure())
+    
+    # Save toggle preference
+    $UI.ToggleHighSpec.Add_Checked({ Save-UserPreference -Key "HighSpec" -Value $true })
+    $UI.ToggleHighSpec.Add_Unchecked({ Save-UserPreference -Key "HighSpec" -Value $false })
+    
+    # Install
+    $UI.BtnInstall.Add_Click({
+        $UI.BtnInstall.IsEnabled = $false; $UI.BtnBackup.IsEnabled = $false; $UI.BtnUninstall.IsEnabled = $false
+        try {
+            $isHigh = $UI.ToggleHighSpec.IsChecked
+            $url = if ($isHigh) { $script:Config.DownloadUrlHigh } else { $script:Config.DownloadUrlLow }
+            & $WriteLog "Modo: $(if ($isHigh) {'GAMA ALTA'} else {'GAMA BAJA'})"
+            
+            & $UpdateStatus "Verificando Minecraft..."; if (-not (Test-MinecraftInstalled)) { [System.Windows.MessageBox]::Show("No se encontró .minecraft"); return }
+            & $WriteLog "Minecraft OK."; & $UpdateProgress 10
+            
+            & $UpdateStatus "Verificando espacio..."; if (-not (Test-DiskSpace)) { [System.Windows.MessageBox]::Show("Espacio insuficiente"); return }
+            & $WriteLog "Espacio OK."; & $UpdateProgress 20
+            
+            $zip = "$($script:Config.TempDir)\mods.zip"; if (-not (Test-Path $script:Config.TempDir)) { New-Item -ItemType Directory -Path $script:Config.TempDir -Force | Out-Null }
+            & $UpdateStatus "Descargando..."; & $WriteLog "Descargando..."
+            $UI.ProgressBar.IsIndeterminate = $true; [System.Windows.Forms.Application]::DoEvents()
+            (New-Object System.Net.WebClient).DownloadFile($url, $zip)
+            $UI.ProgressBar.IsIndeterminate = $false; & $UpdateProgress 50; & $WriteLog "Descarga OK."
+            
+            & $UpdateStatus "Instalando..."; & $WriteLog "Extrayendo..."
+            Install-Modpack -ZipPath $zip; & $UpdateProgress 90
+            
+            Clear-TempFiles; & $UpdateProgress 100
+            & $UpdateStatus "¡INSTALACIÓN COMPLETADA!"; $UI.StatusText.Foreground = [System.Windows.Media.Brushes]::LimeGreen
+            & $WriteLog "¡Listo! Abre el juego."
+            [System.Windows.MessageBox]::Show("¡Modpack instalado!", "PaisaLand", "OK", "Information")
+        } catch { & $WriteLog "ERROR: $($_.Exception.Message)"; [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)") }
+        finally { $UI.BtnInstall.IsEnabled = $true; $UI.BtnBackup.IsEnabled = $true; $UI.BtnUninstall.IsEnabled = $true; $UI.ProgressBar.IsIndeterminate = $false }
+    }.GetNewClosure())
+    
+    # Backup
+    $UI.BtnBackup.Add_Click({
+        try { & $UpdateStatus "Backup..."; & $WriteLog "Respaldando..."; $p = New-Backup; & $WriteLog "Backup: $p"; & $UpdateStatus "Backup listo"; [System.Windows.MessageBox]::Show("Backup en Escritorio.") }
+        catch { & $WriteLog "Error: $($_.Exception.Message)" }
+    }.GetNewClosure())
+    
+    # Uninstall
+    $UI.BtnUninstall.Add_Click({
+        $r = [System.Windows.MessageBox]::Show("¿Eliminar mods?", "Confirmar", "YesNo", "Warning")
+        if ($r -eq "Yes") { try { & $UpdateStatus "Eliminando..."; & $WriteLog "Desinstalando..."; Remove-Modpack; & $WriteLog "OK."; & $UpdateStatus "Mods eliminados"; [System.Windows.MessageBox]::Show("Mods eliminados.") } catch { & $WriteLog "Error: $($_.Exception.Message)" } }
+    }.GetNewClosure())
+    
+    # Init
+    $Window.Add_Loaded({
+        # Load prefs
+        $savedHigh = Get-UserPreference -Key "HighSpec" -Default $false
+        $UI.ToggleHighSpec.IsChecked = $savedHigh
+        
+        & $WriteLog "Verificando servidor..."
+        $s = Get-ServerStatus
+        if ($s.Online) { $UI.ServerIndicator.Fill = [System.Windows.Media.Brushes]::LimeGreen; $UI.ServerStatus.Text = "Servidor: $($s.Message)"; $UI.ServerStatus.Foreground = [System.Windows.Media.Brushes]::LimeGreen }
+        else { $UI.ServerIndicator.Fill = [System.Windows.Media.Brushes]::Red; $UI.ServerStatus.Text = "Servidor: $($s.Message)" }
+        
+        $UI.VersionText.Text = "v$($script:Config.Version)"
+        & $WriteLog "Instalador listo."
+    }.GetNewClosure())
+    
+    [void]$Window.ShowDialog()
 }
 
-# ==================== EVENTOS ====================
-$UI.DragZone.Add_MouseLeftButtonDown({ $Window.DragMove() })
-$UI.BtnClose.Add_Click({ $Window.Close() })
-$UI.BtnMinimize.Add_Click({ $Window.WindowState = "Minimized" })
-$UI.BtnTheme.Add_Click({ Set-Theme -Dark (-not $script:IsDarkMode) })
-
-$UI.ToggleHighSpec.Add_Checked({ Save-UserPreference -Key "HighSpec" -Value $true })
-$UI.ToggleHighSpec.Add_Unchecked({ Save-UserPreference -Key "HighSpec" -Value $false })
-
-$UI.BtnInstall.Add_Click({
-    $UI.BtnInstall.IsEnabled = $false; $UI.BtnBackup.IsEnabled = $false; $UI.BtnUninstall.IsEnabled = $false
-    try {
-        $isHigh = $UI.ToggleHighSpec.IsChecked
-        $url = if ($isHigh) { $script:Config.DownloadUrlHigh } else { $script:Config.DownloadUrlLow }
-        Write-Log "Modo: $(if ($isHigh) {'GAMA ALTA'} else {'GAMA BAJA'})"
-        
-        Update-Status "Verificando Minecraft..."; if (-not (Test-MinecraftInstalled)) { [System.Windows.MessageBox]::Show("No se encontró .minecraft"); return }
-        Write-Log "Minecraft OK."; Update-Progress 10
-        
-        Update-Status "Verificando espacio..."; if (-not (Test-DiskSpace)) { [System.Windows.MessageBox]::Show("Espacio insuficiente"); return }
-        Write-Log "Espacio OK."; Update-Progress 20
-        
-        $zip = "$($script:Config.TempDir)\mods.zip"; if (-not (Test-Path $script:Config.TempDir)) { New-Item -ItemType Directory -Path $script:Config.TempDir -Force | Out-Null }
-        Update-Status "Descargando..."; Write-Log "Descargando..."
-        $UI.ProgressBar.IsIndeterminate = $true; [System.Windows.Forms.Application]::DoEvents()
-        (New-Object System.Net.WebClient).DownloadFile($url, $zip)
-        $UI.ProgressBar.IsIndeterminate = $false; Update-Progress 50; Write-Log "Descarga OK."
-        
-        Update-Status "Instalando..."; Write-Log "Extrayendo..."
-        Install-Modpack -ZipPath $zip; Update-Progress 90
-        
-        Clear-TempFiles; Update-Progress 100
-        Update-Status "¡INSTALACIÓN COMPLETADA!"; $UI.StatusText.Foreground = [System.Windows.Media.Brushes]::LimeGreen
-        Write-Log "¡Listo! Abre el juego."
-        [System.Windows.MessageBox]::Show("¡Modpack instalado!", "PaisaLand", "OK", "Information")
-    } catch { Write-Log "ERROR: $($_.Exception.Message)"; [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)") }
-    finally { $UI.BtnInstall.IsEnabled = $true; $UI.BtnBackup.IsEnabled = $true; $UI.BtnUninstall.IsEnabled = $true; $UI.ProgressBar.IsIndeterminate = $false }
-})
-
-$UI.BtnBackup.Add_Click({
-    try { Update-Status "Backup..."; Write-Log "Respaldando..."; $p = New-Backup; Write-Log "Backup: $p"; Update-Status "Backup listo"; [System.Windows.MessageBox]::Show("Backup en Escritorio.") }
-    catch { Write-Log "Error: $($_.Exception.Message)" }
-})
-
-$UI.BtnUninstall.Add_Click({
-    $r = [System.Windows.MessageBox]::Show("¿Eliminar mods?", "Confirmar", "YesNo", "Warning")
-    if ($r -eq "Yes") { try { Update-Status "Eliminando..."; Write-Log "Desinstalando..."; Remove-Modpack; Write-Log "OK."; Update-Status "Mods eliminados"; [System.Windows.MessageBox]::Show("Mods eliminados.") } catch { Write-Log "Error: $($_.Exception.Message)" } }
-})
-
-# ==================== INICIAR ====================
-$Window.Add_Loaded({ Initialize-Installer })
-[void]$Window.ShowDialog()
+# ==================== START ====================
+$script:IsDarkMode = Get-UserPreference -Key "DarkMode" -Default $true
+Show-Installer -Dark $script:IsDarkMode
