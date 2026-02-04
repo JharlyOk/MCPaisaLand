@@ -48,8 +48,8 @@ function Create-Button($text, $x, $y, $w, $h, $handler) {
     $btn.BackColor = $ColorButton
     $btn.Font = $FontNormal
     $btn.FlatAppearance.BorderSize = 0
-    $btn.add_MouseEnter({ $btn.BackColor = $ColorButtonHover })
-    $btn.add_MouseLeave({ $btn.BackColor = $ColorButton })
+    $btn.add_MouseEnter({ $this.BackColor = $ColorButtonHover })
+    $btn.add_MouseLeave({ $this.BackColor = $ColorButton })
     $btn.add_Click($handler)
     $Form.Controls.Add($btn)
     return $btn
@@ -240,7 +240,7 @@ $ActionBackup = {
         $StatusLabel.Text = "Creando Backup..."
         New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
         
-        $FoldersToBackup = @("mods", "options.txt", "servers.dat")
+        $FoldersToBackup = @("mods", "config", "shaderpacks", "resourcepacks", "emotes", "options.txt", "servers.dat")
         foreach ($item in $FoldersToBackup) {
             $itemPath = "$MinecraftPath\$item"
             if (Test-Path $itemPath) {

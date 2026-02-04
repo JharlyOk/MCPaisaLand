@@ -76,7 +76,7 @@ BACKUP_DIR="$HOME/Desktop/PaisaLand_Backup_$(date +%Y%m%d_%H%M%S)"
 if [ ! -d "$HOME/Desktop" ]; then BACKUP_DIR="$HOME/PaisaLand_Backup_$(date +%Y%m%d_%H%M%S)"; fi
 
 mkdir -p "$BACKUP_DIR"
-for item in mods config shaderpacks options.txt servers.dat; do
+for item in mods config shaderpacks resourcepacks emotes options.txt servers.dat; do
     if [ -e "$MINECRAFT_DIR/$item" ]; then
         cp -r "$MINECRAFT_DIR/$item" "$BACKUP_DIR/"
     fi
