@@ -7,8 +7,8 @@ $script:Config = @{
     Port = 8199
     DownloadUrlLow = "https://www.dropbox.com/scl/fi/0uq96jnx7a3tsfwz79mrg/PC-Gama-Baja.zip?rlkey=oi5am56nw8aihcixj709ksgri&st=id22tog3&dl=1"
     DownloadUrlHigh = "https://www.dropbox.com/scl/fi/mdqsni1k9ht8fuadv9kzd/PC-Gama-Alta.zip?rlkey=wgn6buj6qrnmxeqjsp03by4k5&st=wr6czevh&dl=1"
-    ServerIP = "play.paisaland.com"
-    ServerPort = 25565
+    ServerIP = "199.127.62.118"
+    ServerPort = 25610
     MinecraftPath = "$env:APPDATA\.minecraft"
     TempDir = "$env:TEMP\PaisaLandInstaller"
     ManagedFolders = @("mods", "config", "shaderpacks", "resourcepacks", "emotes", "options.txt", "servers.dat")
@@ -133,6 +133,23 @@ $HTML = @'
             --danger: #ef4444;
             --warning: #f59e0b;
         }
+
+        /* Light Mode */
+        body.light {
+            --bg-gradient: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 50%, #cbd5e1 100%);
+            --card-bg: rgba(255,255,255,0.8);
+            --card-border: rgba(0,0,0,0.08);
+            --card-hover: rgba(0,0,0,0.04);
+            --text-primary: #1e293b;
+            --text-secondary: rgba(30,41,59,0.7);
+            --text-muted: rgba(30,41,59,0.5);
+        }
+        body.light::before {
+            background: radial-gradient(circle at 20% 80%, rgba(16, 185, 129, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%);
+        }
+        body.light .log-section { background: #f8fafc; }
+        body.light .log-line { color: #059669; }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -636,6 +653,16 @@ $HTML = @'
     <script>
         const API = 'http://localhost:{{PORT}}';
         let isHighSpec = false;
+        let isDark = true;
+
+        // Theme Toggle
+        document.getElementById('themeBtn').addEventListener('click', function() {
+            isDark = !isDark;
+            document.body.classList.toggle('light', !isDark);
+            this.innerHTML = isDark 
+                ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
+                : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+        });
 
         function selectMode(high) {
             isHighSpec = high;
