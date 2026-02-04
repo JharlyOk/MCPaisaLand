@@ -1259,19 +1259,19 @@ $HTML = @"
                     
                     var fill = document.getElementById('progressFill');
                     var btn = document.getElementById('btnInstall');
+                    // Consolidated button state based on backend phase
+                    var isProcessing = d.installing || d.phase === 'deleting' || d.phase === 'backup' || 
+                                       d.phase === 'downloading' || d.phase === 'extracting' || d.phase === 'installing';
                     
-                    if (d.installing || d.phase === 'deleting' || d.phase === 'backup') {
+                    if (isProcessing) {
                         fill.classList.add('active');
                         setAllButtonsDisabled(true);
                     } else {
                         fill.classList.remove('active');
-                        // Re-enable buttons when not in a process
-                        if (d.phase === 'complete' || d.phase === 'ready') {
-                            setAllButtonsDisabled(false);
-                        }
+                        setAllButtonsDisabled(false);
                     }
                     
-                    // Handle different phases
+                    // Handle different phases for install button appearance
                     if (d.phase === 'complete') {
                         btn.className = 'btn-install complete';
                         btn.innerHTML = '<i data-feather="play"></i><span>Jugar Minecraft</span>';
@@ -1283,6 +1283,10 @@ $HTML = @"
                         btn.className = 'btn-install';
                         btn.innerHTML = '<i data-feather="download"></i><span>Instalar Modpack</span>';
                         btn.onclick = install;
+                        feather.replace();
+                    } else if (isProcessing && d.phase !== 'complete') {
+                        // Show loading state if actively processing
+                        btn.innerHTML = '<i data-feather="loader"></i><span>Procesando...</span>';
                         feather.replace();
                     }
                     
