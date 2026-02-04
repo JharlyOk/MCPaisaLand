@@ -384,8 +384,10 @@ function Open-MinecraftLauncher {
         "$env:LOCALAPPDATA\Programs\Minecraft Launcher\MinecraftLauncher.exe"
     )
     
-    # TLauncher paths
+    # TLauncher paths (including inside .minecraft folder)
     $paths += @(
+        "$env:APPDATA\.minecraft\TLauncher.exe",
+        "$env:APPDATA\.minecraft\TLauncher32bit.exe",
         "$env:APPDATA\.tlauncher\TLauncher.exe",
         "$env:USERPROFILE\.tlauncher\TLauncher.exe",
         "$env:LOCALAPPDATA\TLauncher\TLauncher.exe",
