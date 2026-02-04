@@ -1,6 +1,6 @@
 # ==============================================================================================
-# PaisaLand Installer v5.0.0 - WOOTING-INSPIRED DESIGN (Dark/Light Mode)
-# Compatible con: irm https://... | iex
+# PaisaLand Installer v5.0.0 - WOOTING-INSPIRED DESIGN
+# Compatible: Windows PowerShell 5.1+, irm ... | iex
 # ==============================================================================================
 
 Add-Type -AssemblyName PresentationFramework
@@ -8,199 +8,149 @@ Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Windows.Forms
 
-# ==================== CONFIGURACIÓN ====================
+# ==================== CONFIG ====================
 $script:Config = @{
     Version = "5.0.0"
-    VersionUrl = "https://raw.githubusercontent.com/JharlyOk/MCPaisaLand/main/version.txt"
     DownloadUrlLow = "https://www.dropbox.com/scl/fi/0uq96jnx7a3tsfwz79mrg/PC-Gama-Baja.zip?rlkey=oi5am56nw8aihcixj709ksgri&st=id22tog3&dl=1"
     DownloadUrlHigh = "https://www.dropbox.com/scl/fi/mdqsni1k9ht8fuadv9kzd/PC-Gama-Alta.zip?rlkey=wgn6buj6qrnmxeqjsp03by4k5&st=wr6czevh&dl=1"
     ServerIP = "play.paisaland.com"
     ServerPort = 25565
     MinecraftPath = "$env:APPDATA\.minecraft"
     TempDir = "$env:TEMP\PaisaLandInstaller"
-    PrefsFile = "$env:APPDATA\PaisaLand\preferences.json"
+    PrefsFile = "$env:APPDATA\PaisaLand\prefs.txt"
     ManagedFolders = @("mods", "config", "shaderpacks", "resourcepacks", "emotes", "options.txt", "servers.dat")
-    MinDiskSpaceMB = 500
 }
 
 $script:IsDarkMode = $true
+$script:IsHighSpec = $false
 
-# ==================== FUNCIONES ====================
+# ==================== FUNCTIONS ====================
 function Test-MinecraftInstalled { return (Test-Path $script:Config.MinecraftPath) }
-function Test-DiskSpace { param([int]$RequiredMB = 500); $drive = (Get-Item $env:APPDATA).PSDrive.Name; return ((Get-PSDrive $drive).Free / 1MB) -ge $RequiredMB }
+function Test-DiskSpace { $drive = (Get-Item $env:APPDATA).PSDrive.Name; return ((Get-PSDrive $drive).Free / 1MB) -ge 500 }
 
 function Get-ServerStatus {
     try {
         $tcp = New-Object System.Net.Sockets.TcpClient
         $ar = $tcp.BeginConnect($script:Config.ServerIP, $script:Config.ServerPort, $null, $null)
-        if ($ar.AsyncWaitHandle.WaitOne(2000, $false) -and $tcp.Connected) { $tcp.Close(); return @{ Online = $true; Message = "En Línea" } }
-        return @{ Online = $false; Message = "Fuera de Línea" }
-    } catch { return @{ Online = $false; Message = "Error" } }
+        if ($ar.AsyncWaitHandle.WaitOne(2000, $false) -and $tcp.Connected) { $tcp.Close(); return @{ Online = $true; Msg = "En Línea" } }
+        return @{ Online = $false; Msg = "Fuera de Línea" }
+    } catch { return @{ Online = $false; Msg = "Error" } }
 }
 
-function Save-UserPreference { param([string]$Key, $Value)
-    $dir = Split-Path $script:Config.PrefsFile -Parent
-    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    $prefs = @{}; if (Test-Path $script:Config.PrefsFile) { $prefs = Get-Content $script:Config.PrefsFile | ConvertFrom-Json -AsHashtable }
-    $prefs[$Key] = $Value; $prefs | ConvertTo-Json | Set-Content $script:Config.PrefsFile
-}
+function Save-Pref { param($K,$V); $dir = Split-Path $script:Config.PrefsFile -Parent; if (-not (Test-Path $dir)) { mkdir $dir -Force | Out-Null }; "$K=$V" | Out-File -Append $script:Config.PrefsFile }
+function Get-Pref { param($K,$D=$null); if (Test-Path $script:Config.PrefsFile) { $lines = Get-Content $script:Config.PrefsFile; foreach($l in $lines) { if ($l -like "$K=*") { return $l.Split("=")[1] } } }; return $D }
 
-function Get-UserPreference { param([string]$Key, $Default = $null)
-    if (Test-Path $script:Config.PrefsFile) { $prefs = Get-Content $script:Config.PrefsFile | ConvertFrom-Json -AsHashtable; if ($prefs.ContainsKey($Key)) { return $prefs[$Key] } }
-    return $Default
-}
-
-function Install-Modpack { param([string]$ZipPath)
-    $tempExtract = "$($script:Config.TempDir)\extracted"
+function Install-Modpack { param($ZipPath)
+    $extract = "$($script:Config.TempDir)\ex"
     $modsPath = "$($script:Config.MinecraftPath)\mods"
     if (Test-Path $modsPath) { Remove-Item "$modsPath\*" -Recurse -Force -ErrorAction SilentlyContinue }
-    Expand-Archive -LiteralPath $ZipPath -DestinationPath $tempExtract -Force
-    $items = Get-ChildItem -Path $tempExtract
-    $src = if ($items.Count -eq 1 -and $items[0].PSIsContainer) { $items[0].FullName } else { $tempExtract }
+    Expand-Archive -LiteralPath $ZipPath -DestinationPath $extract -Force
+    $items = Get-ChildItem -Path $extract
+    $src = if ($items.Count -eq 1 -and $items[0].PSIsContainer) { $items[0].FullName } else { $extract }
     Copy-Item -Path "$src\*" -Destination $script:Config.MinecraftPath -Recurse -Force
 }
 
 function New-Backup {
-    $backupDir = "$env:USERPROFILE\Desktop\PaisaLand_Backup_$(Get-Date -Format 'yyyyMMdd_HHmm')"
-    New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
-    foreach ($item in $script:Config.ManagedFolders) {
-        $p = "$($script:Config.MinecraftPath)\$item"
-        if (Test-Path $p) { Copy-Item -Path $p -Destination $backupDir -Recurse }
-    }
-    return $backupDir
+    $dir = "$env:USERPROFILE\Desktop\PaisaLand_Backup_$(Get-Date -Format 'yyyyMMdd_HHmm')"
+    mkdir $dir -Force | Out-Null
+    foreach ($item in $script:Config.ManagedFolders) { $p = "$($script:Config.MinecraftPath)\$item"; if (Test-Path $p) { Copy-Item -Path $p -Destination $dir -Recurse } }
+    return $dir
 }
 
 function Remove-Modpack { foreach ($item in $script:Config.ManagedFolders) { $p = "$($script:Config.MinecraftPath)\$item"; if (Test-Path $p) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue } } }
 function Clear-TempFiles { if (Test-Path $script:Config.TempDir) { Remove-Item $script:Config.TempDir -Recurse -Force -ErrorAction SilentlyContinue } }
 
-# ==================== THEME COLORS ====================
-$script:Themes = @{
-    Dark = @{
-        Bg = "#2D2D30"; Card = "#1E1E1E"; Text = "#FFFFFF"; SubText = "#888888"; Border = "#404040"; Accent = "#4CAF50"
-    }
-    Light = @{
-        Bg = "#FFFFFF"; Card = "#F5F5F5"; Text = "#1A1A1A"; SubText = "#666666"; Border = "#E0E0E0"; Accent = "#4CAF50"
-    }
-}
-
-# ==================== BUILD XAML FUNCTION ====================
-function Get-InstallerXAML {
+# ==================== XAML ====================
+function Get-XAML {
     param([bool]$Dark = $true)
-    $t = if ($Dark) { $script:Themes.Dark } else { $script:Themes.Light }
-    
+    $bg = if($Dark){"#2D2D30"}else{"#FFFFFF"}
+    $card = if($Dark){"#1E1E1E"}else{"#F5F5F5"}
+    $txt = if($Dark){"#FFFFFF"}else{"#1A1A1A"}
+    $sub = if($Dark){"#888888"}else{"#666666"}
+    $bdr = if($Dark){"#404040"}else{"#E0E0E0"}
+    $acc = "#4CAF50"
+    $themeIcon = if($Dark){"☀"}else{"🌙"}
+
     return @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="PaisaLand Installer" Height="520" Width="480"
+        Title="PaisaLand" Height="480" Width="440"
         WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen">
-
-    <Border CornerRadius="10" Background="$($t.Bg)" BorderBrush="$($t.Border)" BorderThickness="1">
-        <Border.Effect><DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="0" Opacity="0.5"/></Border.Effect>
+    <Border CornerRadius="10" Background="$bg" BorderBrush="$bdr" BorderThickness="1">
+        <Border.Effect><DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/></Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="50"/>
+                <RowDefinition Height="45"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="50"/>
+                <RowDefinition Height="40"/>
             </Grid.RowDefinitions>
 
             <!-- HEADER -->
-            <Grid Grid.Row="0" Name="DragZone" Background="Transparent">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0,0,0">
-                    <TextBlock Text="🎮" FontSize="20" VerticalAlignment="Center"/>
-                    <TextBlock Text=" PAISA" FontSize="16" FontWeight="Bold" Foreground="$($t.Text)" VerticalAlignment="Center"/>
-                    <TextBlock Text="LAND" FontSize="16" FontWeight="Bold" Foreground="$($t.Accent)" VerticalAlignment="Center"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,5,0">
-                    <Button Name="BtnTheme" Content="$(if($Dark){'☀️'}else{'🌙'})" Width="36" Height="36" Background="Transparent" BorderThickness="0" Foreground="$($t.SubText)" FontSize="16" Cursor="Hand"/>
-                    <Button Name="BtnMinimize" Content="─" Width="36" Height="36" Background="Transparent" BorderThickness="0" Foreground="$($t.SubText)" FontSize="14" Cursor="Hand"/>
-                    <Button Name="BtnClose" Content="✕" Width="36" Height="36" Background="Transparent" BorderThickness="0" Foreground="$($t.SubText)" FontSize="14" FontWeight="Bold" Cursor="Hand"/>
-                </StackPanel>
-            </Grid>
+            <Border Grid.Row="0" Name="DragZone" Background="Transparent">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <TextBlock Text="🎮 " FontSize="16"/>
+                        <TextBlock Text="PAISA" FontSize="14" FontWeight="Bold" Foreground="$txt"/>
+                        <TextBlock Text="LAND" FontSize="14" FontWeight="Bold" Foreground="$acc"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,5,0">
+                        <Button Name="BtnTheme" Content="$themeIcon" Width="32" Height="32" Background="Transparent" BorderThickness="0" Foreground="$sub" FontSize="14" Cursor="Hand" ToolTip="Cambiar tema"/>
+                        <Button Name="BtnMin" Content="─" Width="32" Height="32" Background="Transparent" BorderThickness="0" Foreground="$sub" FontSize="12" Cursor="Hand"/>
+                        <Button Name="BtnClose" Content="✕" Width="32" Height="32" Background="Transparent" BorderThickness="0" Foreground="$sub" FontSize="12" FontWeight="Bold" Cursor="Hand"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
 
             <!-- CONTENT -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20,10">
-                <StackPanel>
-                    <!-- Main Toggle Card -->
-                    <Border Background="$($t.Card)" CornerRadius="8" Padding="20" Margin="0,0,0,15">
-                        <Grid>
-                            <StackPanel>
-                                <TextBlock Text="Activar Gama Alta" FontSize="16" FontWeight="SemiBold" Foreground="$($t.Text)"/>
-                                <TextBlock Text="Incluye Shaders, Texturas HD y efectos visuales avanzados." FontSize="12" Foreground="$($t.SubText)" Margin="0,8,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                            <CheckBox Name="ToggleHighSpec" HorizontalAlignment="Right" VerticalAlignment="Top" Cursor="Hand">
-                                <CheckBox.Template>
-                                    <ControlTemplate TargetType="CheckBox">
-                                        <Grid>
-                                            <Border x:Name="Track" Width="50" Height="26" CornerRadius="13" Background="#555555"/>
-                                            <Border x:Name="Thumb" Width="22" Height="22" CornerRadius="11" Background="White" HorizontalAlignment="Left" Margin="2,0,0,0">
-                                                <Border.RenderTransform><TranslateTransform x:Name="ThumbTranslate" X="0"/></Border.RenderTransform>
-                                            </Border>
-                                        </Grid>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsChecked" Value="True">
-                                                <Setter TargetName="Track" Property="Background" Value="$($t.Accent)"/>
-                                                <Setter TargetName="ThumbTranslate" Property="X" Value="24"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </CheckBox.Template>
-                            </CheckBox>
-                        </Grid>
-                    </Border>
-                    
-                    <!-- Server Status Card -->
-                    <Border Background="$($t.Card)" CornerRadius="8" Padding="15" Margin="0,0,0,15">
+            <StackPanel Grid.Row="1" Margin="15,5,15,5">
+                <!-- Toggle Card -->
+                <Border Background="$card" CornerRadius="8" Padding="15" Margin="0,0,0,10">
+                    <Grid>
                         <StackPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <Ellipse Name="ServerIndicator" Width="10" Height="10" Fill="#E53935"/>
-                                <TextBlock Name="ServerStatus" Text="Servidor: Verificando..." Foreground="$($t.SubText)" FontSize="12" Margin="8,0,0,0"/>
-                            </StackPanel>
-                            <TextBlock Name="StatusText" Text="Listo para instalar" Foreground="$($t.Text)" FontSize="14" Margin="0,10,0,0"/>
-                            <ProgressBar Name="ProgressBar" Height="4" Background="#333333" Foreground="$($t.Accent)" BorderThickness="0" Margin="0,10,0,0" Value="0"/>
+                            <TextBlock Text="Gama Alta" FontSize="14" FontWeight="SemiBold" Foreground="$txt"/>
+                            <TextBlock Text="Shaders + Texturas HD" FontSize="11" Foreground="$sub" Margin="0,4,0,0"/>
                         </StackPanel>
-                    </Border>
-                    
-                    <!-- Install Button -->
-                    <Button Name="BtnInstall" Cursor="Hand">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="Bd" Background="$($t.Accent)" CornerRadius="6" Padding="24,14">
-                                    <TextBlock Text="⬇️  INSTALAR MODPACK" FontSize="14" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center"/>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="#66BB6A"/></Trigger>
-                                    <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Background" Value="#555555"/></Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
-                    
-                    <!-- Advanced Section -->
-                    <Expander Name="AdvancedExpander" Margin="0,15,0,0" Foreground="$($t.Text)">
-                        <Expander.Header>
-                            <TextBlock Text="Opciones Avanzadas" FontWeight="SemiBold" Foreground="$($t.Text)"/>
-                        </Expander.Header>
-                        <StackPanel Margin="0,10,0,0">
-                            <Border Background="#0A0A0A" CornerRadius="6" Padding="10" Height="80" Margin="0,0,0,10">
-                                <ScrollViewer Name="LogScroller" VerticalScrollBarVisibility="Auto">
-                                    <TextBlock Name="LogText" Text="> Instalador PaisaLand v5.0" Foreground="#00DD00" FontFamily="Consolas" FontSize="10" TextWrapping="Wrap"/>
-                                </ScrollViewer>
-                            </Border>
-                            <StackPanel Orientation="Horizontal">
-                                <Button Name="BtnBackup" Content="📁 Backup" Background="Transparent" BorderBrush="$($t.Border)" BorderThickness="1" Foreground="$($t.SubText)" Padding="12,8" Cursor="Hand" Margin="0,0,10,0"/>
-                                <Button Name="BtnUninstall" Content="🗑️ Desinstalar" Background="Transparent" BorderBrush="#E53935" BorderThickness="1" Foreground="#E53935" Padding="12,8" Cursor="Hand"/>
-                            </StackPanel>
+                        <CheckBox Name="ChkHigh" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand"/>
+                    </Grid>
+                </Border>
+
+                <!-- Status Card -->
+                <Border Background="$card" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Name="ServerDot" Width="8" Height="8" Fill="#E53935"/>
+                            <TextBlock Name="ServerTxt" Text="Servidor: ..." Foreground="$sub" FontSize="11" Margin="6,0,0,0"/>
                         </StackPanel>
-                    </Expander>
+                        <TextBlock Name="StatusTxt" Text="Listo" Foreground="$txt" FontSize="13" Margin="0,8,0,0"/>
+                        <ProgressBar Name="Progress" Height="3" Background="#333" Foreground="$acc" BorderThickness="0" Margin="0,8,0,0" Value="0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Install Button -->
+                <Button Name="BtnInstall" Height="42" Background="$acc" Foreground="White" FontSize="13" FontWeight="SemiBold" Cursor="Hand" BorderThickness="0">
+                    <Button.Content>⬇  INSTALAR</Button.Content>
+                </Button>
+
+                <!-- Log -->
+                <Border Background="#0A0A0A" CornerRadius="5" Padding="8" Margin="0,10,0,0" Height="70">
+                    <ScrollViewer Name="LogScroll" VerticalScrollBarVisibility="Auto">
+                        <TextBlock Name="LogTxt" Text="> PaisaLand v5.0" Foreground="#00DD00" FontFamily="Consolas" FontSize="10" TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- Secondary Buttons -->
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <Button Name="BtnBackup" Content="📁 Backup" Background="Transparent" BorderBrush="$bdr" BorderThickness="1" Foreground="$sub" Padding="10,6" Cursor="Hand" Margin="0,0,8,0"/>
+                    <Button Name="BtnUninstall" Content="🗑 Eliminar" Background="Transparent" BorderBrush="#E53935" BorderThickness="1" Foreground="#E53935" Padding="10,6" Cursor="Hand"/>
                 </StackPanel>
-            </ScrollViewer>
+            </StackPanel>
 
             <!-- FOOTER -->
-            <Border Grid.Row="2" BorderBrush="$($t.Border)" BorderThickness="0,1,0,0" Padding="15,0">
+            <Border Grid.Row="2" BorderBrush="$bdr" BorderThickness="0,1,0,0" Padding="12,0">
                 <Grid VerticalAlignment="Center">
-                    <TextBlock Text="Powered by JharlyOk" Foreground="$($t.SubText)" FontSize="11" HorizontalAlignment="Center"/>
-                    <TextBlock Name="VersionText" Text="v5.0.0" Foreground="$($t.SubText)" FontSize="11" HorizontalAlignment="Right"/>
+                    <TextBlock Text="by JharlyOk" Foreground="$sub" FontSize="10" HorizontalAlignment="Center"/>
+                    <TextBlock Text="v5.0.0" Foreground="$sub" FontSize="10" HorizontalAlignment="Right"/>
                 </Grid>
             </Border>
         </Grid>
@@ -209,104 +159,102 @@ function Get-InstallerXAML {
 "@
 }
 
-# ==================== CREATE AND SHOW WINDOW ====================
-function Show-Installer {
+# ==================== SHOW WINDOW ====================
+function Show-App {
     param([bool]$Dark = $true)
     
-    $xamlString = Get-InstallerXAML -Dark $Dark
-    [xml]$XAML = $xamlString
+    $xaml = Get-XAML -Dark $Dark
+    [xml]$x = $xaml
+    $reader = New-Object System.Xml.XmlNodeReader $x
+    $win = [Windows.Markup.XamlReader]::Load($reader)
     
-    $Reader = New-Object System.Xml.XmlNodeReader $XAML
-    $Window = [Windows.Markup.XamlReader]::Load($Reader)
-    
-    # Map controls
-    $controls = @("DragZone","BtnTheme","BtnMinimize","BtnClose","ToggleHighSpec","ServerIndicator","ServerStatus","StatusText","ProgressBar","BtnInstall","AdvancedExpander","LogScroller","LogText","BtnBackup","BtnUninstall","VersionText")
-    $UI = @{}; foreach ($n in $controls) { $c = $Window.FindName($n); if ($c) { $UI[$n] = $c } }
+    # Controls
+    $dragZone = $win.FindName("DragZone")
+    $btnTheme = $win.FindName("BtnTheme")
+    $btnMin = $win.FindName("BtnMin")
+    $btnClose = $win.FindName("BtnClose")
+    $chkHigh = $win.FindName("ChkHigh")
+    $serverDot = $win.FindName("ServerDot")
+    $serverTxt = $win.FindName("ServerTxt")
+    $statusTxt = $win.FindName("StatusTxt")
+    $progress = $win.FindName("Progress")
+    $btnInstall = $win.FindName("BtnInstall")
+    $logScroll = $win.FindName("LogScroll")
+    $logTxt = $win.FindName("LogTxt")
+    $btnBackup = $win.FindName("BtnBackup")
+    $btnUninstall = $win.FindName("BtnUninstall")
     
     # Helpers
-    $WriteLog = { param($M); $UI.LogText.Text += "`n> $M"; $UI.LogScroller.ScrollToEnd(); [System.Windows.Forms.Application]::DoEvents() }
-    $UpdateStatus = { param($M); $UI.StatusText.Text = $M; [System.Windows.Forms.Application]::DoEvents() }
-    $UpdateProgress = { param($V); $UI.ProgressBar.Value = $V; [System.Windows.Forms.Application]::DoEvents() }
+    $log = { param($m); $logTxt.Text += "`n> $m"; $logScroll.ScrollToEnd(); [System.Windows.Forms.Application]::DoEvents() }
+    $status = { param($m); $statusTxt.Text = $m; [System.Windows.Forms.Application]::DoEvents() }
+    $prog = { param($v); $progress.Value = $v; [System.Windows.Forms.Application]::DoEvents() }
     
-    # Events
-    $UI.DragZone.Add_MouseLeftButtonDown({ $Window.DragMove() })
-    $UI.BtnClose.Add_Click({ $Window.Close() })
-    $UI.BtnMinimize.Add_Click({ $Window.WindowState = "Minimized" })
+    # Window Events
+    $dragZone.Add_MouseLeftButtonDown({ $win.DragMove() })
+    $btnClose.Add_Click({ $win.Close() })
+    $btnMin.Add_Click({ $win.WindowState = "Minimized" })
     
-    # Theme Toggle - Restart window with new theme
-    $UI.BtnTheme.Add_Click({
-        $newDark = -not $script:IsDarkMode
-        $script:IsDarkMode = $newDark
-        Save-UserPreference -Key "DarkMode" -Value $newDark
-        $Window.Close()
-        Show-Installer -Dark $newDark
+    # Theme Toggle
+    $btnTheme.Add_Click({
+        $script:IsDarkMode = -not $script:IsDarkMode
+        $win.Close()
+        Show-App -Dark $script:IsDarkMode
     }.GetNewClosure())
     
-    # Save toggle preference
-    $UI.ToggleHighSpec.Add_Checked({ Save-UserPreference -Key "HighSpec" -Value $true })
-    $UI.ToggleHighSpec.Add_Unchecked({ Save-UserPreference -Key "HighSpec" -Value $false })
-    
     # Install
-    $UI.BtnInstall.Add_Click({
-        $UI.BtnInstall.IsEnabled = $false; $UI.BtnBackup.IsEnabled = $false; $UI.BtnUninstall.IsEnabled = $false
+    $btnInstall.Add_Click({
+        $btnInstall.IsEnabled = $false
         try {
-            $isHigh = $UI.ToggleHighSpec.IsChecked
-            $url = if ($isHigh) { $script:Config.DownloadUrlHigh } else { $script:Config.DownloadUrlLow }
-            & $WriteLog "Modo: $(if ($isHigh) {'GAMA ALTA'} else {'GAMA BAJA'})"
+            $url = if ($chkHigh.IsChecked) { $script:Config.DownloadUrlHigh } else { $script:Config.DownloadUrlLow }
+            & $log "Modo: $(if($chkHigh.IsChecked){'ALTA'}else{'BAJA'})"
             
-            & $UpdateStatus "Verificando Minecraft..."; if (-not (Test-MinecraftInstalled)) { [System.Windows.MessageBox]::Show("No se encontró .minecraft"); return }
-            & $WriteLog "Minecraft OK."; & $UpdateProgress 10
+            & $status "Verificando..."; if (-not (Test-MinecraftInstalled)) { [System.Windows.MessageBox]::Show("No se encontró .minecraft"); return }
+            & $log "Minecraft OK"; & $prog 10
             
-            & $UpdateStatus "Verificando espacio..."; if (-not (Test-DiskSpace)) { [System.Windows.MessageBox]::Show("Espacio insuficiente"); return }
-            & $WriteLog "Espacio OK."; & $UpdateProgress 20
+            & $status "Espacio..."; if (-not (Test-DiskSpace)) { [System.Windows.MessageBox]::Show("Sin espacio"); return }
+            & $log "Espacio OK"; & $prog 20
             
-            $zip = "$($script:Config.TempDir)\mods.zip"; if (-not (Test-Path $script:Config.TempDir)) { New-Item -ItemType Directory -Path $script:Config.TempDir -Force | Out-Null }
-            & $UpdateStatus "Descargando..."; & $WriteLog "Descargando..."
-            $UI.ProgressBar.IsIndeterminate = $true; [System.Windows.Forms.Application]::DoEvents()
+            $zip = "$($script:Config.TempDir)\m.zip"; if (-not (Test-Path $script:Config.TempDir)) { mkdir $script:Config.TempDir -Force | Out-Null }
+            & $status "Descargando..."; & $log "Descargando..."
+            $progress.IsIndeterminate = $true; [System.Windows.Forms.Application]::DoEvents()
             (New-Object System.Net.WebClient).DownloadFile($url, $zip)
-            $UI.ProgressBar.IsIndeterminate = $false; & $UpdateProgress 50; & $WriteLog "Descarga OK."
+            $progress.IsIndeterminate = $false; & $prog 50; & $log "OK"
             
-            & $UpdateStatus "Instalando..."; & $WriteLog "Extrayendo..."
-            Install-Modpack -ZipPath $zip; & $UpdateProgress 90
+            & $status "Instalando..."; & $log "Extrayendo..."
+            Install-Modpack -ZipPath $zip; & $prog 90
             
-            Clear-TempFiles; & $UpdateProgress 100
-            & $UpdateStatus "¡INSTALACIÓN COMPLETADA!"; $UI.StatusText.Foreground = [System.Windows.Media.Brushes]::LimeGreen
-            & $WriteLog "¡Listo! Abre el juego."
-            [System.Windows.MessageBox]::Show("¡Modpack instalado!", "PaisaLand", "OK", "Information")
-        } catch { & $WriteLog "ERROR: $($_.Exception.Message)"; [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)") }
-        finally { $UI.BtnInstall.IsEnabled = $true; $UI.BtnBackup.IsEnabled = $true; $UI.BtnUninstall.IsEnabled = $true; $UI.ProgressBar.IsIndeterminate = $false }
+            Clear-TempFiles; & $prog 100
+            & $status "¡LISTO!"; $statusTxt.Foreground = [System.Windows.Media.Brushes]::LimeGreen
+            & $log "Completado!"
+            [System.Windows.MessageBox]::Show("¡Instalado!", "PaisaLand")
+        } catch { & $log "ERROR: $($_.Exception.Message)"; [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)") }
+        finally { $btnInstall.IsEnabled = $true; $progress.IsIndeterminate = $false }
     }.GetNewClosure())
     
     # Backup
-    $UI.BtnBackup.Add_Click({
-        try { & $UpdateStatus "Backup..."; & $WriteLog "Respaldando..."; $p = New-Backup; & $WriteLog "Backup: $p"; & $UpdateStatus "Backup listo"; [System.Windows.MessageBox]::Show("Backup en Escritorio.") }
-        catch { & $WriteLog "Error: $($_.Exception.Message)" }
+    $btnBackup.Add_Click({
+        try { & $status "Backup..."; & $log "Creando..."; $p = New-Backup; & $log "OK: $p"; & $status "Backup OK"; [System.Windows.MessageBox]::Show("Backup creado") }
+        catch { & $log "Error: $($_.Exception.Message)" }
     }.GetNewClosure())
     
     # Uninstall
-    $UI.BtnUninstall.Add_Click({
+    $btnUninstall.Add_Click({
         $r = [System.Windows.MessageBox]::Show("¿Eliminar mods?", "Confirmar", "YesNo", "Warning")
-        if ($r -eq "Yes") { try { & $UpdateStatus "Eliminando..."; & $WriteLog "Desinstalando..."; Remove-Modpack; & $WriteLog "OK."; & $UpdateStatus "Mods eliminados"; [System.Windows.MessageBox]::Show("Mods eliminados.") } catch { & $WriteLog "Error: $($_.Exception.Message)" } }
+        if ($r -eq "Yes") { try { & $status "Eliminando..."; Remove-Modpack; & $log "Eliminado"; & $status "OK"; [System.Windows.MessageBox]::Show("Mods eliminados") } catch { & $log "Error" } }
     }.GetNewClosure())
     
     # Init
-    $Window.Add_Loaded({
-        # Load prefs
-        $savedHigh = Get-UserPreference -Key "HighSpec" -Default $false
-        $UI.ToggleHighSpec.IsChecked = $savedHigh
-        
-        & $WriteLog "Verificando servidor..."
+    $win.Add_Loaded({
+        & $log "Verificando servidor..."
         $s = Get-ServerStatus
-        if ($s.Online) { $UI.ServerIndicator.Fill = [System.Windows.Media.Brushes]::LimeGreen; $UI.ServerStatus.Text = "Servidor: $($s.Message)"; $UI.ServerStatus.Foreground = [System.Windows.Media.Brushes]::LimeGreen }
-        else { $UI.ServerIndicator.Fill = [System.Windows.Media.Brushes]::Red; $UI.ServerStatus.Text = "Servidor: $($s.Message)" }
-        
-        $UI.VersionText.Text = "v$($script:Config.Version)"
-        & $WriteLog "Instalador listo."
+        if ($s.Online) { $serverDot.Fill = [System.Windows.Media.Brushes]::LimeGreen; $serverTxt.Text = "Servidor: $($s.Msg)"; $serverTxt.Foreground = [System.Windows.Media.Brushes]::LimeGreen }
+        else { $serverDot.Fill = [System.Windows.Media.Brushes]::Red; $serverTxt.Text = "Servidor: $($s.Msg)" }
+        & $log "Listo"
     }.GetNewClosure())
     
-    [void]$Window.ShowDialog()
+    [void]$win.ShowDialog()
 }
 
 # ==================== START ====================
-$script:IsDarkMode = Get-UserPreference -Key "DarkMode" -Default $true
-Show-Installer -Dark $script:IsDarkMode
+$script:IsDarkMode = $true
+Show-App -Dark $script:IsDarkMode
