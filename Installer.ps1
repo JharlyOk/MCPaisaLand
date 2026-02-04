@@ -288,30 +288,48 @@ function Remove-Modpack {
 }
 
 function Open-MinecraftLauncher {
-    Add-Log "Abriendo Minecraft Launcher..."
+    Add-Log "Buscando Minecraft Launcher..."
+    
+    # Common paths for Minecraft Launcher
     $launcherPaths = @(
         "$env:ProgramFiles\Minecraft Launcher\MinecraftLauncher.exe",
-        "$env:ProgramFiles(x86)\Minecraft Launcher\MinecraftLauncher.exe",
-        "$env:LOCALAPPDATA\Packages\Microsoft.4297127D64EC6_8wekyb3d8bbwe\LocalCache\Local\runtime\java-runtime-gamma\windows-x64\java-runtime-gamma\bin\javaw.exe"
+        "${env:ProgramFiles(x86)}\Minecraft Launcher\MinecraftLauncher.exe",
+        "$env:LOCALAPPDATA\Programs\Minecraft Launcher\MinecraftLauncher.exe",
+        "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Minecraft Launcher\Minecraft Launcher.lnk",
+        "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Minecraft Launcher.lnk"
     )
     
     foreach ($path in $launcherPaths) {
         if (Test-Path $path) {
+            Add-Log "Encontrado: $path"
             Start-Process $path
             Add-Log "Launcher iniciado"
             return $true
         }
     }
     
-    # Intentar via protocolo
-    try {
-        Start-Process "minecraft://"
-        Add-Log "Launcher iniciado via protocolo"
+    # Search in Start Menu
+    $startMenuSearch = Get-ChildItem -Path "$env:APPDATA\Microsoft\Windows\Start Menu" -Filter "*Minecraft*" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($startMenuSearch) {
+        Add-Log "Encontrado en Start Menu: $($startMenuSearch.Name)"
+        Start-Process $startMenuSearch.FullName
         return $true
-    } catch {
-        Add-Log "No se pudo abrir el launcher automaticamente"
-        return $false
     }
+    
+    # Try shell protocol (works for Microsoft Store version)
+    Add-Log "Intentando protocolo shell..."
+    try {
+        Start-Process "shell:AppsFolder\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft"
+        Add-Log "Launcher iniciado (MS Store)"
+        return $true
+    } catch {}
+    
+    # Final fallback - open .minecraft folder
+    Add-Log "No se encontro el launcher - abriendo carpeta .minecraft"
+    if (Test-Path $script:Config.MinecraftPath) {
+        Start-Process "explorer.exe" -ArgumentList $script:Config.MinecraftPath
+    }
+    return $false
 }
 
 # ==================== HTML ====================
