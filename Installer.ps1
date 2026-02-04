@@ -48,8 +48,8 @@ function Create-Button($text, $x, $y, $w, $h, $handler) {
     $btn.BackColor = $ColorButton
     $btn.Font = $FontNormal
     $btn.FlatAppearance.BorderSize = 0
-    $btn.add_MouseEnter({ $this.BackColor = $ColorButtonHover })
-    $btn.add_MouseLeave({ $this.BackColor = $ColorButton })
+    $btn.add_MouseEnter({ param($sender,$e) $sender.BackColor = $ColorButtonHover })
+    $btn.add_MouseLeave({ param($sender,$e) $sender.BackColor = $ColorButton })
     $btn.add_Click($handler)
     $Form.Controls.Add($btn)
     return $btn
