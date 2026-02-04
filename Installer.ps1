@@ -1116,6 +1116,7 @@ $HTML = @"
         var API = 'http://localhost:{{PORT}}';
         var isHighSpec = false;
         var systemData = {};
+        var isLocalProcessing = false; // Track local processing state
         
         feather.replace();
         
@@ -1259,13 +1260,19 @@ $HTML = @"
                     
                     var fill = document.getElementById('progressFill');
                     var btn = document.getElementById('btnInstall');
-                    // Consolidated button state based on backend phase
-                    var isProcessing = d.installing || d.phase === 'deleting' || d.phase === 'backup' || 
+                    // Consolidated button state based on backend phase OR local processing
+                    var isBackendProcessing = d.installing || d.phase === 'deleting' || d.phase === 'backup' || 
                                        d.phase === 'downloading' || d.phase === 'extracting' || d.phase === 'installing';
+                    var shouldDisable = isBackendProcessing || isLocalProcessing;
                     
-                    if (isProcessing) {
+                    if (shouldDisable) {
                         fill.classList.add('active');
                         setAllButtonsDisabled(true);
+                        // Show processing state on main button
+                        if (!btn.innerHTML.includes('Instalando') && !btn.innerHTML.includes('Jugar')) {
+                            btn.innerHTML = '<i data-feather="loader"></i><span>Procesando...</span>';
+                            feather.replace();
+                        }
                     } else {
                         fill.classList.remove('active');
                         setAllButtonsDisabled(false);
@@ -1278,15 +1285,11 @@ $HTML = @"
                         btn.onclick = launch;
                         btn.disabled = false;
                         feather.replace();
-                    } else if (d.phase === 'ready' && d.progress === 0) {
-                        // Reset to normal state
+                    } else if (d.phase === 'ready' && d.progress === 0 && !isLocalProcessing) {
+                        // Reset to normal state only if not locally processing
                         btn.className = 'btn-install';
                         btn.innerHTML = '<i data-feather="download"></i><span>Instalar Modpack</span>';
                         btn.onclick = install;
-                        feather.replace();
-                    } else if (isProcessing && d.phase !== 'complete') {
-                        // Show loading state if actively processing
-                        btn.innerHTML = '<i data-feather="loader"></i><span>Procesando...</span>';
                         feather.replace();
                     }
                     
@@ -1344,6 +1347,7 @@ $HTML = @"
         
         function install() {
             var btn = document.getElementById('btnInstall');
+            isLocalProcessing = true;
             btn.innerHTML = '<i data-feather="loader"></i><span>Instalando, espere...</span>';
             feather.replace();
             showToast('Instalacion iniciada', 'success');
@@ -1351,6 +1355,7 @@ $HTML = @"
             fetch(API + '/install?high=' + isHighSpec, { method: 'POST' })
                 .catch(function() { 
                     showToast('Error de conexion', 'error'); 
+                    isLocalProcessing = false;
                     setAllButtonsDisabled(false);
                     btn.innerHTML = '<i data-feather="download"></i><span>Instalar Modpack</span>';
                     feather.replace();
@@ -1358,12 +1363,13 @@ $HTML = @"
         }
         
         function backup() {
+            isLocalProcessing = true;
             showToast('Creando backup...', 'success');
             setAllButtonsDisabled(true);
             fetch(API + '/backup', { method: 'POST' })
                 .then(function() { showToast('Backup guardado en Escritorio', 'success'); })
                 .catch(function() {})
-                .finally(function() { setAllButtonsDisabled(false); });
+                .finally(function() { isLocalProcessing = false; setAllButtonsDisabled(false); });
         }
         
         function launch() {
@@ -1382,12 +1388,13 @@ $HTML = @"
         
         function confirmUninstall() {
             closeConfirm();
+            isLocalProcessing = true;
             showToast('Limpiando instalacion...', 'success');
             setAllButtonsDisabled(true);
             fetch(API + '/uninstall', { method: 'POST' })
                 .then(function() { showToast('Limpieza completada', 'success'); })
                 .catch(function() {})
-                .finally(function() { setAllButtonsDisabled(false); });
+                .finally(function() { isLocalProcessing = false; setAllButtonsDisabled(false); });
         }
         
         // Fast polling - 300ms
