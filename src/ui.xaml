@@ -1,0 +1,111 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PaisaLand Installer" Height="600" Width="900"
+        WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <ResourceDictionary Source="styles.xaml"/>
+    </Window.Resources>
+
+    <!-- CONTENEDOR PRINCIPAL CON SOMBRA -->
+    <Border CornerRadius="12" Background="{StaticResource BgBrush}">
+        <Border.Effect>
+            <DropShadowEffect Color="Black" BlurRadius="25" ShadowDepth="0" Opacity="0.6"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="50"/>  <!-- Header -->
+                <RowDefinition Height="50"/>  <!-- Status Bar -->
+                <RowDefinition Height="*"/>   <!-- Content -->
+                <RowDefinition Height="80"/>  <!-- Footer -->
+            </Grid.RowDefinitions>
+
+            <!-- ========== HEADER ========== -->
+            <Grid Grid.Row="0" Background="Transparent" Name="DragZone">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
+                    <TextBlock Text="PAISA" FontSize="22" FontWeight="Black" Foreground="White"/>
+                    <TextBlock Text="LAND" FontSize="22" FontWeight="Black" Foreground="{StaticResource AccentBrush}"/>
+                    <TextBlock Text=" Installer" FontSize="14" FontWeight="Light" Foreground="#888888" VerticalAlignment="Bottom" Margin="5,0,0,3"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Name="BtnMinimize" Style="{StaticResource MinimizeButtonStyle}"/>
+                    <Button Name="BtnClose" Style="{StaticResource CloseButtonStyle}"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- ========== STATUS BAR ========== -->
+            <Border Grid.Row="1" Background="#151515" Padding="20,0">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Name="ServerIndicator" Width="10" Height="10" Fill="#E53935"/>
+                        <TextBlock Name="ServerStatus" Text="Servidor: Verificando..." Foreground="#888888" FontSize="12" Margin="8,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock Name="VersionBadge" Text="v4.0.0" Foreground="#444444" FontSize="11"/>
+                        <Border Name="UpdateBadge" Background="{StaticResource AccentBrush}" CornerRadius="3" Padding="6,2" Margin="10,0,0,0" Visibility="Collapsed">
+                            <TextBlock Text="ACTUALIZACIÓN" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ========== MAIN CONTENT ========== -->
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="25,20,25,0">
+                    
+                    <!-- Sección: Selección de Versión -->
+                    <TextBlock Text="SELECCIONA TU VERSIÓN" Foreground="#555555" FontSize="11" FontWeight="Bold" Margin="0,0,0,12"/>
+                    
+                    <Grid Height="130">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <RadioButton Name="RadioLow" Grid.Column="0" Content="💻 PC GAMA BAJA" 
+                                     Tag="Optimizado para máximo FPS. Sin shaders ni texturas pesadas. Ideal para PCs modestos."
+                                     Style="{StaticResource SelectionCardStyle}" IsChecked="True"/>
+                        
+                        <RadioButton Name="RadioHigh" Grid.Column="1" Content="🎮 PC GAMA ALTA"
+                                     Tag="Experiencia visual completa. Incluye Shaders, Texturas HD, y animaciones avanzadas."
+                                     Style="{StaticResource SelectionCardStyle}"/>
+                    </Grid>
+
+                    <!-- Sección: Estado -->
+                    <TextBlock Text="ESTADO" Foreground="#555555" FontSize="11" FontWeight="Bold" Margin="0,25,0,12"/>
+                    
+                    <Border Background="#151515" CornerRadius="8" Padding="15">
+                        <StackPanel>
+                            <TextBlock Name="StatusText" Text="Listo para instalar" Foreground="White" FontSize="14"/>
+                            <ProgressBar Name="ProgressBar" Style="{StaticResource ModernProgressStyle}" Margin="0,12,0,0" Value="0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Sección: Log -->
+                    <Border Background="#0A0A0A" CornerRadius="6" Margin="0,15,0,0" Padding="12" Height="100">
+                        <ScrollViewer Name="LogScroller" VerticalScrollBarVisibility="Auto">
+                            <TextBlock Name="LogText" Text="> Bienvenido al instalador de PaisaLand v4.0" 
+                                       Foreground="#00DD00" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                    </Border>
+                    
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ========== FOOTER ========== -->
+            <Border Grid.Row="3" Background="#0A0A0A" Padding="25,0">
+                <Grid VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                        <Button Name="BtnBackup" Content="📁 Crear Backup" Style="{StaticResource LinkButtonStyle}"/>
+                        <Button Name="BtnUninstall" Content="🗑️ Desinstalar Mods" Style="{StaticResource DangerButtonStyle}" Margin="20,0,0,0"/>
+                    </StackPanel>
+                    <Button Name="BtnInstall" Content="⬇️ INSTALAR MODPACK" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Right"/>
+                </Grid>
+            </Border>
+
+        </Grid>
+    </Border>
+</Window>
