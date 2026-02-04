@@ -1280,10 +1280,14 @@ $HTML = @"
                     
                     // Handle different phases for install button appearance
                     if (d.phase === 'complete') {
+                        isLocalProcessing = false; // Reset local processing
+                        setAllButtonsDisabled(false); // Re-enable all buttons
                         btn.className = 'btn-install complete';
                         btn.innerHTML = '<i data-feather="play"></i><span>Jugar Minecraft</span>';
                         btn.onclick = launch;
                         btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.pointerEvents = 'auto';
                         feather.replace();
                     } else if (d.phase === 'ready' && d.progress === 0 && !isLocalProcessing) {
                         // Reset to normal state only if not locally processing
@@ -1332,10 +1336,12 @@ $HTML = @"
         }
         
         function setAllButtonsDisabled(disabled) {
-            // Disable all buttons
-            var btns = document.querySelectorAll('.btn-install, .btn-action, button');
+            // Disable action buttons (not theme toggle or close buttons)
+            var btns = document.querySelectorAll('.btn-install, .btn-action');
             for (var i = 0; i < btns.length; i++) {
                 btns[i].disabled = disabled;
+                btns[i].style.opacity = disabled ? '0.5' : '1';
+                btns[i].style.pointerEvents = disabled ? 'none' : 'auto';
             }
             // Disable version cards
             var cards = document.querySelectorAll('.version-card');
