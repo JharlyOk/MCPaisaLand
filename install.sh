@@ -6,8 +6,8 @@
 
 # --- CONFIGURACIÓN ---
 # ¡IMPORTANTE! REEMPLAZA ESTOS LINKS POR LOS TUYOS DE DROPBOX
-URL_LOW="URL_GAMA_BAJA_AQUI"
-URL_HIGH="URL_GAMA_ALTA_AQUI"
+URL_LOW="https://www.dropbox.com/scl/fi/0uq96jnx7a3tsfwz79mrg/PC-Gama-Baja.zip?rlkey=oi5am56nw8aihcixj709ksgri&st=id22tog3&dl=0"
+URL_HIGH="https://www.dropbox.com/scl/fi/mdqsni1k9ht8fuadv9kzd/PC-Gama-Alta.zip?rlkey=wgn6buj6qrnmxeqjsp03by4k5&st=wr6czevh&dl=0"
 
 # Auto-corregir links de Dropbox (dl=0 -> dl=1)
 URL_LOW=${URL_LOW//dl=0/dl=1}

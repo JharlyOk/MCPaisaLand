@@ -9,8 +9,8 @@ Add-Type -AssemblyName System.Drawing
 # --- CONFIGURACIÓN ---
 # ¡IMPORTANTE! REEMPLAZA ESTOS LINKS POR LOS TUYOS DE DROPBOX
 # Si terminan en dl=0, el script lo arreglará automáticamente.
-$DownloadUrlLow = "URL_GAMA_BAJA_AQUI".Replace("dl=0", "dl=1")
-$DownloadUrlHigh = "URL_GAMA_ALTA_AQUI".Replace("dl=0", "dl=1")
+$DownloadUrlLow = "https://www.dropbox.com/scl/fi/0uq96jnx7a3tsfwz79mrg/PC-Gama-Baja.zip?rlkey=oi5am56nw8aihcixj709ksgri&st=id22tog3&dl=0".Replace("dl=0", "dl=1")
+$DownloadUrlHigh = "https://www.dropbox.com/scl/fi/mdqsni1k9ht8fuadv9kzd/PC-Gama-Alta.zip?rlkey=wgn6buj6qrnmxeqjsp03by4k5&st=wr6czevh&dl=0".Replace("dl=0", "dl=1")
 $InstallerTitle = "PaisaLand - Instalador Oficial de Mods"
 $MinecraftPath = "$env:APPDATA\.minecraft"
 $TempDir = "$env:TEMP\PaisaLandInstaller"
