@@ -1,70 +1,47 @@
-# 🎮 PaisaLand - Instalador de Mods v4.0
+# 🎮 PaisaLand - Instalador de Mods v9.0
 
 ![Windows](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
-![Linux](https://img.shields.io/badge/Platform-Linux%2FmacOS-FCC624?style=for-the-badge&logo=linux&logoColor=black)
-![PowerShell](https://img.shields.io/badge/Built%20With-PowerShell%20%2B%20WPF-5391FE?style=for-the-badge&logo=powershell&logoColor=white)
-![Version](https://img.shields.io/badge/Version-4.0.0-green?style=for-the-badge)
+![PowerShell](https://img.shields.io/badge/Built%20With-PowerShell%20%2B%20HTML-5391FE?style=for-the-badge&logo=powershell&logoColor=white)
+![Version](https://img.shields.io/badge/Version-9.0.0-green?style=for-the-badge)
 
 > **Instalador oficial del servidor de Minecraft "PaisaLand".**  
 > Descarga e instala automáticamente mods, shaders y texturas con una interfaz moderna y profesional.
 
 ---
 
-## ✨ Características v4.0
+## ✨ Características v9.0
 
 | Característica | Descripción |
 |----------------|-------------|
-| 🎨 **UI Premium** | Interfaz WPF moderna con efectos de sombra, animaciones y tema oscuro |
+| 🎨 **UI Moderna** | Interfaz HTML con glassmorphism, animaciones y tema oscuro/claro |
 | 🌐 **Estado del Servidor** | Indicador en tiempo real (Online/Offline) |
-| 🔄 **Verificación de Versión** | Detecta automáticamente si hay actualizaciones disponibles |
-| 💾 **Verificación de Espacio** | Comprueba que tengas suficiente espacio en disco antes de instalar |
+| ✅ **Verificación del Sistema** | Detecta Java, Minecraft, Forge y RAM automáticamente |
+| 📊 **Progreso en Tiempo Real** | Barra de progreso que se actualiza durante la descarga |
 | 📁 **Backup Inteligente** | Guarda todos tus mods actuales antes de instalar |
-| 🗑️ **Desinstalador** | Elimina todos los mods de PaisaLand con un clic |
-| 💭 **Recordar Preferencia** | Guarda tu última selección (Gama Alta/Baja) |
-| ⚡ **Dos Versiones** | Gama Baja (FPS) y Gama Alta (Visual) |
+| 🗑️ **Limpieza Completa** | Elimina mods, configs, shaders y resourcepacks |
+| 🎯 **Guía de Instalación** | Banner de bienvenida con instrucciones paso a paso |
+| ⚡ **Dos Versiones** | Gama Baja (FPS) y Gama Alta (Shaders + HD) |
+| 🌙 **Tema Oscuro/Claro** | Toggle de tema integrado |
 
 ---
 
 ## 🚀 Instalación Rápida
 
-### 🪟 Windows (PowerShell)
 Abre PowerShell y ejecuta:
 ```powershell
 irm https://raw.githubusercontent.com/JharlyOk/MCPaisaLand/main/Installer.ps1 | iex
 ```
 
-### 🐧 Linux / macOS (Terminal)
-```bash
-curl -sL https://raw.githubusercontent.com/JharlyOk/MCPaisaLand/main/install.sh | bash
-```
-
----
-
-## 📸 Vista Previa
-
-La interfaz incluye:
-- ✅ Ventana sin bordes con esquinas redondeadas
-- ✅ Efectos de sombra (Drop Shadow)
-- ✅ Botones con animaciones al hover
-- ✅ Tarjetas de selección interactivas
-- ✅ Barra de progreso moderna
-- ✅ Terminal de logs en tiempo real
-
----
-
-## 📥 Instalación Manual
-
-1. Descarga el repositorio como ZIP
-2. Extrae los archivos
-3. Ejecuta `Jugar_PaisaLand.bat` (Windows) o `./install.sh` (Linux/Mac)
+O ejecuta `Jugar_PaisaLand.bat` si ya tienes los archivos descargados.
 
 ---
 
 ## 🛠️ Requisitos
 
 - **Windows**: Windows 10/11 con PowerShell 5.1+
-- **Linux/Mac**: Bash, curl, unzip
+- **Java**: Java 17 o superior
 - **Minecraft**: Instalado y ejecutado al menos una vez
+- **Forge**: Forge 1.20.1 (el instalador te guía si no lo tienes)
 - **Espacio**: Mínimo 500MB libres
 
 ---
@@ -73,17 +50,12 @@ La interfaz incluye:
 
 ```
 📁 MCPaisaLand/
-├── 📄 Installer.ps1      → Instalador principal (Windows)
-├── 📄 install.sh         → Instalador Linux/Mac
+├── 📄 Installer.ps1       → Instalador principal
 ├── 📄 Jugar_PaisaLand.bat → Launcher rápido
-├── 📄 version.txt        → Control de versiones
-├── 📄 README.md          → Este archivo
-├── 📄 CHANGELOG.md       → Historial de cambios
-└── 📁 src/               → Módulos (para desarrollo)
-    ├── config.ps1
-    ├── functions.ps1
-    ├── styles.xaml
-    └── ui.xaml
+├── 📄 version.txt         → Control de versiones
+├── 📄 README.md           → Este archivo
+├── 📄 CHANGELOG.md        → Historial de cambios
+└── 📄 LICENSE             → MIT License
 ```
 
 ---

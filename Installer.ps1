@@ -169,19 +169,31 @@ function Install-Modpack {
     try {
         $wc = New-Object System.Net.WebClient
         
-        # Download with progress using events
+        # Download with progress using async
         $script:Status.SubProgress = "Descargando modpack..."
         
-        # Use async download with progress
-        Register-ObjectEvent -InputObject $wc -EventName DownloadProgressChanged -Action {
-            $percent = $Event.SourceEventArgs.ProgressPercentage
-            # Map 0-100% to 20-55%
+        # Track progress with Add_DownloadProgressChanged
+        $wc.Add_DownloadProgressChanged({
+            param($sender, $e)
+            $percent = $e.ProgressPercentage
             $script:Status.Progress = 20 + [int]($percent * 0.35)
             $script:Status.SubProgress = "Descargando... $percent%"
-        } | Out-Null
+        })
         
-        $wc.DownloadFileTaskAsync($url, $zip).Wait()
-        Get-EventSubscriber | Where-Object { $_.SourceObject -eq $wc } | Unregister-Event
+        $wc.Add_DownloadFileCompleted({
+            param($sender, $e)
+            $script:DownloadComplete = $true
+        })
+        
+        $script:DownloadComplete = $false
+        $wc.DownloadFileAsync([uri]$url, $zip)
+        
+        # Wait for download while allowing UI updates
+        while (-not $script:DownloadComplete) {
+            Start-Sleep -Milliseconds 100
+        }
+        
+        $wc.Dispose()
         
         Add-Log "Descarga completada"
         $script:Status.Progress = 55
@@ -935,8 +947,8 @@ $HTML = @"
                         <button class="btn-action" onclick="launch()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px;">
                             <i data-feather="play"></i> Abrir Minecraft
                         </button>
-                        <button class="btn-action danger" onclick="uninstall()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px;">
-                            <i data-feather="trash-2"></i> Eliminar Mods
+                        <button class="btn-action danger" onclick="showConfirmUninstall()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px;">
+                            <i data-feather="trash-2"></i> Limpiar Todo
                         </button>
                     </div>
                 </div>
@@ -1005,6 +1017,19 @@ $HTML = @"
             <p id="modalText">Informacion de ayuda</p>
             <a class="modal-link" id="modalLink" href="#" target="_blank">Descargar</a>
             <button class="modal-close" onclick="closeModal()">Cerrar</button>
+        </div>
+    </div>
+    
+    <!-- Confirm Modal -->
+    <div class="modal-overlay" id="confirmOverlay" onclick="closeConfirm()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-icon warn"><i data-feather="alert-triangle"></i></div>
+            <h2>Confirmar Limpieza</h2>
+            <p>Esto eliminara: mods, config, shaders, resourcepacks y emotes.<br><br>Esta accion no se puede deshacer.</p>
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                <button class="modal-close" onclick="closeConfirm()" style="flex: 1;">Cancelar</button>
+                <button class="modal-link" onclick="confirmUninstall()" style="flex: 1; text-align: center;">Eliminar</button>
+            </div>
         </div>
     </div>
     
@@ -1232,12 +1257,19 @@ $HTML = @"
                 .catch(function() {});
         }
         
-        function uninstall() {
-            if (confirm('Eliminar todos los mods de PaisaLand?\n\nEsto eliminara: mods, config, shaders, resourcepacks')) {
-                fetch(API + '/uninstall', { method: 'POST' })
-                    .then(function() { showToast('Mods eliminados', 'success'); })
-                    .catch(function() {});
-            }
+        function showConfirmUninstall() {
+            document.getElementById('confirmOverlay').classList.add('show');
+        }
+        
+        function closeConfirm() {
+            document.getElementById('confirmOverlay').classList.remove('show');
+        }
+        
+        function confirmUninstall() {
+            closeConfirm();
+            fetch(API + '/uninstall', { method: 'POST' })
+                .then(function() { showToast('Limpieza completada', 'success'); })
+                .catch(function() {});
         }
         
         // Fast polling - 300ms
