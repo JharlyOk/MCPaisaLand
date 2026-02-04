@@ -8,7 +8,7 @@ $script:Config = @{
     Port = 8199
     MinecraftVersion = "1.20.1"
     ForgeVersion = "47.2.0"
-    DownloadUrlLow = "https://www.dropbox.com/scl/fi/gjgnnvpz5xdm442xa43ae/PC-Gama-Baja.zip?rlkey=hpa1trom00ry39zprrvjl1jku&st=csniqjqs&dl=1"
+    DownloadUrlLow = "https://www.dropbox.com/scl/fi/njy2qfgr45lhzz1ua1lps/PC-Gama-Baja.zip?rlkey=ejqy25o7ao5r4w5z2n0dnbxyh&st=mhd4djac&dl=1"
     DownloadUrlHigh = "https://www.dropbox.com/scl/fi/7oa2zlfk49qlodywemdq0/PC-Gama-Alta.zip?rlkey=onre1p965lwu0brr9skzxw3qp&st=vrdvwo93&dl=1"
     ForgeInstallerUrl = "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-installer.jar"
     ServerIP = "199.127.62.118"
@@ -143,8 +143,15 @@ function Invoke-SystemCheck {
 function Add-Log { 
     param($msg)
     $ts = Get-Date -Format "HH:mm:ss"
-    $script:Status.Log += "[$ts] $msg"
+    $logLine = "[$ts] $msg"
+    $script:Status.Log += $logLine
     if ($script:Status.Log.Count -gt 50) { $script:Status.Log = $script:Status.Log[-30..-1] }
+    
+    # File logging for debugging
+    try {
+        $logFile = "$env:TEMP\PaisaLand_Installer.log"
+        Add-Content -Path $logFile -Value $logLine -ErrorAction SilentlyContinue
+    } catch {}
 }
 
 function Install-Modpack {
