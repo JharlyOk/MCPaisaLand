@@ -353,6 +353,16 @@ $HTML = @"
             --yellow: #f59e0b;
             --blue: #3b82f6;
         }
+        body.light {
+            --bg1: #f5f7fa;
+            --bg2: #ffffff;
+            --bg3: #eef1f5;
+            --card: rgba(0,0,0,0.02);
+            --border: rgba(0,0,0,0.08);
+            --text1: #1a1a2e;
+            --text2: rgba(0,0,0,0.7);
+            --text3: rgba(0,0,0,0.5);
+        }
         body {
             font-family: 'Inter', sans-serif;
             background: var(--bg1);
@@ -725,10 +735,87 @@ $HTML = @"
         .toast.error .toast-icon { color: var(--red); }
         .toast-text { font-size: 14px; }
         
+        /* Theme Button */
+        .theme-btn {
+            width: 40px; height: 40px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .theme-btn:hover { background: var(--bg3); color: var(--text1); }
+        
+        /* Welcome Banner */
+        .welcome-banner {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(59,130,246,0.1));
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            margin-bottom: 24px;
+        }
+        .welcome-banner.hidden { display: none; }
+        .welcome-icon {
+            width: 40px; height: 40px;
+            background: var(--green);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            flex-shrink: 0;
+        }
+        .welcome-content { flex: 1; }
+        .welcome-content h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .welcome-content p { font-size: 12px; color: var(--text2); line-height: 1.5; }
+        .welcome-content strong { color: var(--green); }
+        .welcome-close {
+            width: 32px; height: 32px;
+            background: transparent;
+            border: none;
+            color: var(--text3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .welcome-close:hover { background: var(--bg3); color: var(--text1); }
+        
+        /* Footer */
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .footer-left { font-size: 12px; color: var(--text3); }
+        .footer-left a { color: var(--green); text-decoration: none; }
+        .footer-right { display: flex; align-items: center; gap: 12px; }
+        .footer-version {
+            font-size: 11px;
+            color: var(--text3);
+            padding: 4px 12px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+        }
+        
         /* Responsive */
         @media (max-width: 768px) {
             .main-grid { grid-template-columns: 1fr; }
             .sidebar { order: 2; }
+            .welcome-banner { flex-direction: column; text-align: center; }
         }
     </style>
 </head>
@@ -739,11 +826,26 @@ $HTML = @"
                 <div class="brand-icon">P</div>
                 <h1>PAISA<span>LAND</span></h1>
             </div>
-            <div class="server-badge">
-                <div class="server-dot" id="serverDot"></div>
-                <span id="serverText">Verificando...</span>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div class="server-badge">
+                    <div class="server-dot" id="serverDot"></div>
+                    <span id="serverText">Verificando...</span>
+                </div>
+                <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Cambiar tema">
+                    <i data-feather="moon"></i>
+                </button>
             </div>
         </header>
+        
+        <!-- Welcome Guide -->
+        <div class="welcome-banner" id="welcomeBanner">
+            <div class="welcome-icon"><i data-feather="info"></i></div>
+            <div class="welcome-content">
+                <h3>Bienvenido al Instalador de PaisaLand</h3>
+                <p>Sigue estos pasos: <strong>1.</strong> Verifica que todo este en verde a la izquierda <strong>2.</strong> Selecciona tu version <strong>3.</strong> Haz clic en Instalar</p>
+            </div>
+            <button class="welcome-close" onclick="closeWelcome()"><i data-feather="x"></i></button>
+        </div>
         
         <div class="main-grid">
             <aside class="sidebar">
@@ -843,6 +945,16 @@ $HTML = @"
                 </div>
             </main>
         </div>
+        
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-left">
+                Creado por <a href="https://github.com/JharlyOk" target="_blank">JharlyOk</a> para la comunidad PaisaLand
+            </div>
+            <div class="footer-right">
+                <span class="footer-version">v9.0.0</span>
+            </div>
+        </footer>
     </div>
     
     <!-- Help Modal -->
@@ -868,6 +980,21 @@ $HTML = @"
         var systemData = {};
         
         feather.replace();
+        
+        // Theme Toggle
+        var isDark = true;
+        function toggleTheme() {
+            isDark = !isDark;
+            document.body.classList.toggle('light', !isDark);
+            var btn = document.getElementById('themeBtn');
+            btn.innerHTML = isDark ? '<i data-feather="moon"></i>' : '<i data-feather="sun"></i>';
+            feather.replace();
+        }
+        
+        // Close Welcome Banner
+        function closeWelcome() {
+            document.getElementById('welcomeBanner').classList.add('hidden');
+        }
         
         function selectVersion(high) {
             isHighSpec = high;
