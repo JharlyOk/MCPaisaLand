@@ -167,33 +167,36 @@ function Install-Modpack {
     $script:Status.Progress = 20
     
     try {
-        $wc = New-Object System.Net.WebClient
-        
-        # Download with progress using async
+        # Simulated progress during download
         $script:Status.SubProgress = "Descargando modpack..."
+        $script:Status.Progress = 25
         
-        # Track progress with Add_DownloadProgressChanged
-        $wc.Add_DownloadProgressChanged({
-            param($sender, $e)
-            $percent = $e.ProgressPercentage
-            $script:Status.Progress = 20 + [int]($percent * 0.35)
-            $script:Status.SubProgress = "Descargando... $percent%"
-        })
+        # Start download in background job
+        $job = Start-Job -ScriptBlock {
+            param($url, $zip)
+            $wc = New-Object System.Net.WebClient
+            $wc.DownloadFile($url, $zip)
+        } -ArgumentList $url, $zip
         
-        $wc.Add_DownloadFileCompleted({
-            param($sender, $e)
-            $script:DownloadComplete = $true
-        })
-        
-        $script:DownloadComplete = $false
-        $wc.DownloadFileAsync([uri]$url, $zip)
-        
-        # Wait for download while allowing UI updates
-        while (-not $script:DownloadComplete) {
-            Start-Sleep -Milliseconds 100
+        # Update progress while downloading
+        $progressSteps = @(30, 35, 40, 45, 50)
+        $stepIndex = 0
+        while ($job.State -eq 'Running') {
+            Start-Sleep -Milliseconds 500
+            if ($stepIndex -lt $progressSteps.Count) {
+                $script:Status.Progress = $progressSteps[$stepIndex]
+                $script:Status.SubProgress = "Descargando... $($progressSteps[$stepIndex] * 2 - 20)%"
+                $stepIndex++
+            }
         }
         
-        $wc.Dispose()
+        # Check for errors
+        $result = Receive-Job -Job $job -ErrorAction SilentlyContinue
+        Remove-Job -Job $job -Force
+        
+        if (-not (Test-Path $zip)) {
+            throw "Descarga fallida"
+        }
         
         Add-Log "Descarga completada"
         $script:Status.Progress = 55
@@ -464,6 +467,11 @@ $HTML = @"
             border-radius: 10px;
             font-size: 13px;
             color: var(--text2);
+            opacity: 0;
+            animation: fadeIn 0.4s ease 0.3s forwards;
+        }
+        @keyframes fadeIn {
+            to { opacity: 1; }
         }
         .server-dot {
             width: 8px; height: 8px;
@@ -515,6 +523,16 @@ $HTML = @"
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.2s;
+            opacity: 0;
+            animation: fadeInUp 0.4s ease forwards;
+        }
+        .check-item:nth-child(1) { animation-delay: 0.1s; }
+        .check-item:nth-child(2) { animation-delay: 0.2s; }
+        .check-item:nth-child(3) { animation-delay: 0.3s; }
+        .check-item:nth-child(4) { animation-delay: 0.4s; }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .check-item:hover { background: rgba(255,255,255,0.05); }
         .check-icon {
@@ -1027,8 +1045,8 @@ $HTML = @"
             <h2>Confirmar Limpieza</h2>
             <p>Esto eliminara: mods, config, shaders, resourcepacks y emotes.<br><br>Esta accion no se puede deshacer.</p>
             <div style="display: flex; gap: 12px; margin-top: 20px;">
-                <button class="modal-close" onclick="closeConfirm()" style="flex: 1;">Cancelar</button>
-                <button class="modal-link" onclick="confirmUninstall()" style="flex: 1; text-align: center;">Eliminar</button>
+                <button class="modal-close" onclick="closeConfirm()" style="flex: 1; padding: 14px;">Cancelar</button>
+                <button class="btn-danger" onclick="confirmUninstall()" style="flex: 1; padding: 14px; background: linear-gradient(135deg, #ef4444, #dc2626); border: none; border-radius: 10px; color: white; font-size: 14px; font-weight: 600; cursor: pointer;">Eliminar</button>
             </div>
         </div>
     </div>
