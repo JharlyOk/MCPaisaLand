@@ -1421,7 +1421,13 @@ $HTML = @"
         function launch() {
             showToast('Abriendo Minecraft...', 'success');
             fetch(API + '/launch', { method: 'POST' })
-                .catch(function() {});
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (!d.ok) {
+                        showToast('Launcher no encontrado - Abrelo manualmente', 'error');
+                    }
+                })
+                .catch(function() { showToast('Error al abrir launcher', 'error'); });
         }
         
         function showConfirmUninstall() {
@@ -1536,7 +1542,7 @@ function Start-Installer {
                     $script:Status.Phase = "ready"
                     $result = @{ ok = $true }
                 }
-                "/launch" { Open-MinecraftLauncher; $result = @{ ok = $true } }
+                "/launch" { $success = Open-MinecraftLauncher; $result = @{ ok = $success } }
                 default { $result = @{ error = "404" } }
             }
             
