@@ -247,24 +247,36 @@ function Install-Modpack {
 function New-Backup {
     Add-Log "Creando backup..."
     $script:Status.Message = "Creando backup..."
-    $script:Status.SubProgress = "Copiando archivos"
+    $script:Status.SubProgress = "Preparando"
+    $script:Status.Progress = 10
+    $script:Status.Phase = "backup"
     
     $ts = Get-Date -Format "yyyyMMdd_HHmmss"
     $dir = "$env:USERPROFILE\Desktop\PaisaLand_Backup_$ts"
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     
+    $total = $script:Config.ManagedFolders.Count
     $copied = 0
+    $current = 0
+    
     foreach ($item in $script:Config.ManagedFolders) {
+        $current++
         $p = "$($script:Config.MinecraftPath)\$item"
+        $script:Status.SubProgress = "Copiando $item..."
+        $script:Status.Progress = [int](10 + (80 * $current / $total))
+        
         if (Test-Path $p) { 
             Copy-Item -Path $p -Destination $dir -Recurse -ErrorAction SilentlyContinue
             $copied++
         }
+        Start-Sleep -Milliseconds 100
     }
     
+    $script:Status.Progress = 100
     Add-Log "Backup: $dir ($copied items)"
     $script:Status.Message = "Backup creado"
     $script:Status.SubProgress = "Guardado en Escritorio"
+    $script:Status.Phase = "ready"
     return $dir
 }
 
@@ -272,19 +284,31 @@ function Remove-Modpack {
     Add-Log "Eliminando mods..."
     $script:Status.Message = "Eliminando..."
     $script:Status.SubProgress = "Borrando archivos"
+    $script:Status.Progress = 10
+    $script:Status.Phase = "deleting"
     
+    $total = $script:Config.ManagedFolders.Count
     $removed = 0
+    $current = 0
+    
     foreach ($item in $script:Config.ManagedFolders) {
+        $current++
         $p = "$($script:Config.MinecraftPath)\$item"
+        $script:Status.SubProgress = "Eliminando $item..."
+        $script:Status.Progress = [int](10 + (80 * $current / $total))
+        
         if (Test-Path $p) { 
             Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue
             $removed++
         }
+        Start-Sleep -Milliseconds 100
     }
     
+    $script:Status.Progress = 100
     Add-Log "Eliminados: $removed elementos"
     $script:Status.Message = "Mods eliminados"
     $script:Status.SubProgress = "$removed elementos borrados"
+    $script:Status.Phase = "ready"
 }
 
 function Open-MinecraftLauncher {
@@ -681,6 +705,7 @@ $HTML = @"
         }
         .modal-icon.error { background: rgba(239,68,68,0.15); color: var(--red); }
         .modal-icon.warn { background: rgba(245,158,11,0.15); color: var(--yellow); }
+        .modal-icon.ok { background: rgba(16,185,129,0.15); color: var(--green); }
         .modal h2 { font-size: 20px; margin-bottom: 10px; }
         .modal p { font-size: 14px; color: var(--text2); line-height: 1.6; margin-bottom: 20px; }
         .modal-link {
@@ -761,7 +786,12 @@ $HTML = @"
             border-radius: 14px;
             margin-bottom: 24px;
         }
-        .welcome-banner.hidden { display: none; }
+        .welcome-banner.hidden { 
+            animation: fadeOut 0.3s ease forwards;
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateY(-10px); max-height: 0; padding: 0; margin: 0; border: 0; overflow: hidden; }
+        }
         .welcome-icon {
             width: 40px; height: 40px;
             background: var(--green);
@@ -1000,6 +1030,21 @@ $HTML = @"
             isHighSpec = high;
             document.getElementById('versionLow').classList.toggle('active', !high);
             document.getElementById('versionHigh').classList.toggle('active', high);
+            // Reset button if completed
+            resetButtonState();
+        }
+        
+        function resetButtonState() {
+            var btn = document.getElementById('btnInstall');
+            btn.className = 'btn-install';
+            btn.innerHTML = '<i data-feather="download"></i><span>Instalar Modpack</span>';
+            btn.disabled = false;
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressPercent').textContent = '0%';
+            document.getElementById('progressTitle').textContent = 'Listo para instalar';
+            document.getElementById('progressSub').textContent = '';
+            feather.replace();
+            fetch(API + '/reset', { method: 'POST' }).catch(function(){});
         }
         
         function showToast(msg, type) {
@@ -1030,13 +1075,36 @@ $HTML = @"
                 text: 'Forge es necesario para ejecutar mods. Descarga el instalador de Forge 1.20.1 y ejecutalo.',
                 link: 'https://files.minecraftforge.net/net/minecraftforge/forge/index_1.20.1.html',
                 linkText: 'Descargar Forge'
+            },
+            java_ok: {
+                icon: 'ok',
+                title: 'Java OK',
+                text: 'Java esta instalado correctamente. No necesitas hacer nada.',
+                hideLink: true
+            },
+            minecraft_ok: {
+                icon: 'ok',
+                title: 'Minecraft OK',
+                text: 'Minecraft esta instalado correctamente. Puedes continuar con la instalacion.',
+                hideLink: true
+            },
+            forge_ok: {
+                icon: 'ok',
+                title: 'Forge OK',
+                text: 'Forge esta instalado correctamente. Ya puedes instalar el modpack.',
+                hideLink: true
             }
         };
         
         function showHelp(type) {
-            if (type === 'java' && systemData.java && systemData.java.ok) return;
-            if (type === 'minecraft' && systemData.minecraft && systemData.minecraft.ok) return;
-            if (type === 'forge' && systemData.forge && systemData.forge.ok) return;
+            // Check if item is OK, show success message
+            if (type === 'java' && systemData.java && systemData.java.ok) {
+                type = 'java_ok';
+            } else if (type === 'minecraft' && systemData.minecraft && systemData.minecraft.ok) {
+                type = 'minecraft_ok';
+            } else if (type === 'forge' && systemData.forge && systemData.forge.ok) {
+                type = 'forge_ok';
+            }
             
             var data = helpData[type];
             if (!data) return;
@@ -1044,8 +1112,16 @@ $HTML = @"
             document.getElementById('modalIcon').className = 'modal-icon ' + data.icon;
             document.getElementById('modalTitle').textContent = data.title;
             document.getElementById('modalText').textContent = data.text;
-            document.getElementById('modalLink').href = data.link;
-            document.getElementById('modalLink').textContent = data.linkText;
+            
+            var linkEl = document.getElementById('modalLink');
+            if (data.hideLink) {
+                linkEl.style.display = 'none';
+            } else {
+                linkEl.style.display = 'block';
+                linkEl.href = data.link;
+                linkEl.textContent = data.linkText;
+            }
+            
             document.getElementById('modalOverlay').classList.add('show');
         }
         
@@ -1072,7 +1148,7 @@ $HTML = @"
                     var fill = document.getElementById('progressFill');
                     var btn = document.getElementById('btnInstall');
                     
-                    if (d.installing) {
+                    if (d.installing || d.phase === 'deleting' || d.phase === 'backup') {
                         fill.classList.add('active');
                         btn.disabled = true;
                     } else {
@@ -1080,9 +1156,15 @@ $HTML = @"
                         btn.disabled = false;
                     }
                     
+                    // Handle different phases
                     if (d.phase === 'complete') {
                         btn.className = 'btn-install complete';
                         btn.innerHTML = '<i data-feather="check-circle"></i><span>Completado - Listo para jugar!</span>';
+                        feather.replace();
+                    } else if (d.phase === 'ready' && d.progress === 0) {
+                        // Reset to normal state
+                        btn.className = 'btn-install';
+                        btn.innerHTML = '<i data-feather="download"></i><span>Instalar Modpack</span>';
                         feather.replace();
                     }
                     
@@ -1226,6 +1308,13 @@ function Start-Installer {
                 }
                 "/backup" { New-Backup; $result = @{ ok = $true } }
                 "/uninstall" { Remove-Modpack; $result = @{ ok = $true } }
+                "/reset" {
+                    $script:Status.Message = "Listo"
+                    $script:Status.Progress = 0
+                    $script:Status.SubProgress = ""
+                    $script:Status.Phase = "ready"
+                    $result = @{ ok = $true }
+                }
                 "/launch" { Open-MinecraftLauncher; $result = @{ ok = $true } }
                 default { $result = @{ error = "404" } }
             }
