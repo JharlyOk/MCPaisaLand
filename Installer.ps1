@@ -1,109 +1,95 @@
 # ==============================================================================================
-# PaisaLand Installer v8.0.0 - COMPLETE EDITION
-# Automatiza: Deteccion Java/MC/Forge, instalacion de mods, shaders, resourcepacks
+# PaisaLand Installer v9.0.0 - WIZARD EDITION
+# Instalador paso a paso con guia completa para nuevos usuarios
 # ==============================================================================================
 
 $script:Config = @{
-    Version = "8.0.0"
+    Version = "9.0.0"
     Port = 8199
     MinecraftVersion = "1.20.1"
     ForgeVersion = "47.2.0"
     DownloadUrlLow = "https://www.dropbox.com/scl/fi/0uq96jnx7a3tsfwz79mrg/PC-Gama-Baja.zip?rlkey=oi5am56nw8aihcixj709ksgri&st=id22tog3&dl=1"
     DownloadUrlHigh = "https://www.dropbox.com/scl/fi/mdqsni1k9ht8fuadv9kzd/PC-Gama-Alta.zip?rlkey=wgn6buj6qrnmxeqjsp03by4k5&st=wr6czevh&dl=1"
     ForgeInstallerUrl = "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-installer.jar"
-    JavaDownloadUrl = "https://download.oracle.com/java/17/latest/jdk-17_windows-x64_bin.exe"
     ServerIP = "play.paisaland.com"
     ServerPort = 25565
     MinecraftPath = "$env:APPDATA\.minecraft"
     TempDir = "$env:TEMP\PaisaLandInstaller"
-    ManagedFolders = @("mods", "config", "shaderpacks", "resourcepacks", "emotes", "options.txt", "servers.dat")
+    ManagedFolders = @("mods", "config", "shaderpacks", "resourcepacks", "emotes")
 }
 
 $script:Status = @{ 
-    Message = "Iniciando..."; 
-    Progress = 0; 
-    Log = @(); 
-    Complete = $false;
-    Phase = "init"
+    Message = "Listo"
+    Progress = 0
+    Log = @()
+    Phase = "ready"
+    SubProgress = ""
 }
 $script:SystemCheck = @{
-    Java = @{ OK = $false; Version = ""; Path = "" }
-    Minecraft = @{ OK = $false; Path = "" }
-    Forge = @{ OK = $false; Version = "" }
-    RAM = @{ OK = $false; Total = 0; Available = 0 }
-    Disk = @{ OK = $false; Free = 0 }
+    Java = @{ OK = $false; Version = ""; Message = "" }
+    Minecraft = @{ OK = $false; Message = "" }
+    Forge = @{ OK = $false; Version = ""; Message = "" }
+    RAM = @{ OK = $false; Total = 0; Message = "" }
 }
 $script:Installing = $false
 
-# ==================== DETECTION FUNCTIONS ====================
+# ==================== DETECTION ====================
 
 function Test-JavaInstalled {
     try {
-        $javaPath = Get-Command java -ErrorAction SilentlyContinue
-        if ($javaPath) {
-            $versionOutput = & java -version 2>&1 | Out-String
-            if ($versionOutput -match '(\d+\.\d+\.\d+|\d+)') {
+        $javaCmd = Get-Command java -ErrorAction SilentlyContinue
+        if ($javaCmd) {
+            $ver = & java -version 2>&1 | Out-String
+            if ($ver -match '(\d+)') {
                 $script:SystemCheck.Java.OK = $true
                 $script:SystemCheck.Java.Version = $matches[1]
-                $script:SystemCheck.Java.Path = $javaPath.Source
+                $script:SystemCheck.Java.Message = "Java $($matches[1]) instalado"
                 return $true
             }
         }
     } catch {}
     $script:SystemCheck.Java.OK = $false
+    $script:SystemCheck.Java.Message = "Java no encontrado"
     return $false
 }
 
 function Test-MinecraftInstalled {
-    $mcPath = $script:Config.MinecraftPath
-    if (Test-Path $mcPath) {
+    if (Test-Path $script:Config.MinecraftPath) {
         $script:SystemCheck.Minecraft.OK = $true
-        $script:SystemCheck.Minecraft.Path = $mcPath
+        $script:SystemCheck.Minecraft.Message = "Minecraft detectado"
         return $true
     }
     $script:SystemCheck.Minecraft.OK = $false
+    $script:SystemCheck.Minecraft.Message = "No encontrado"
     return $false
 }
 
 function Test-ForgeInstalled {
     $versionsPath = "$($script:Config.MinecraftPath)\versions"
     if (Test-Path $versionsPath) {
-        $forgeVersions = Get-ChildItem -Path $versionsPath -Directory | Where-Object { $_.Name -like "*forge*" -or $_.Name -like "*Forge*" }
-        if ($forgeVersions.Count -gt 0) {
+        $forge = Get-ChildItem $versionsPath -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*forge*" -or $_.Name -like "*Forge*" } | Select-Object -First 1
+        if ($forge) {
             $script:SystemCheck.Forge.OK = $true
-            $script:SystemCheck.Forge.Version = $forgeVersions[0].Name
+            $script:SystemCheck.Forge.Version = $forge.Name
+            $script:SystemCheck.Forge.Message = $forge.Name
             return $true
         }
     }
     $script:SystemCheck.Forge.OK = $false
+    $script:SystemCheck.Forge.Message = "No instalado"
     return $false
 }
 
 function Test-SystemRAM {
     try {
-        $os = Get-CimInstance -ClassName Win32_OperatingSystem
-        $totalRAM = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
-        $freeRAM = [math]::Round($os.FreePhysicalMemory / 1MB, 1)
-        $script:SystemCheck.RAM.Total = $totalRAM
-        $script:SystemCheck.RAM.Available = $freeRAM
-        $script:SystemCheck.RAM.OK = $totalRAM -ge 6
-        return $script:SystemCheck.RAM.OK
+        $os = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
+        $totalGB = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
+        $script:SystemCheck.RAM.Total = $totalGB
+        $script:SystemCheck.RAM.OK = $totalGB -ge 4
+        $script:SystemCheck.RAM.Message = "$totalGB GB RAM"
     } catch {
         $script:SystemCheck.RAM.OK = $true
-        return $true
-    }
-}
-
-function Test-DiskSpace {
-    try {
-        $drive = (Get-Item $env:APPDATA).PSDrive.Name
-        $freeGB = [math]::Round((Get-PSDrive $drive).Free / 1GB, 1)
-        $script:SystemCheck.Disk.Free = $freeGB
-        $script:SystemCheck.Disk.OK = $freeGB -ge 2
-        return $script:SystemCheck.Disk.OK
-    } catch {
-        $script:SystemCheck.Disk.OK = $true
-        return $true
+        $script:SystemCheck.RAM.Message = "OK"
     }
 }
 
@@ -113,142 +99,146 @@ function Get-ServerStatus {
         $ar = $tcp.BeginConnect($script:Config.ServerIP, $script:Config.ServerPort, $null, $null)
         if ($ar.AsyncWaitHandle.WaitOne(2000, $false) -and $tcp.Connected) { 
             $tcp.Close()
-            return @{ Online = $true; Message = "Online" } 
+            return @{ Online = $true; Message = "Online - $($script:Config.ServerIP)" } 
         }
         return @{ Online = $false; Message = "Offline" }
     } catch { return @{ Online = $false; Message = "Error" } }
 }
 
 function Invoke-SystemCheck {
-    Add-Log "Verificando sistema..."
+    Add-Log "Escaneando sistema..."
     Test-JavaInstalled | Out-Null
     Test-MinecraftInstalled | Out-Null
     Test-ForgeInstalled | Out-Null
-    Test-SystemRAM | Out-Null
-    Test-DiskSpace | Out-Null
-    
-    if ($script:SystemCheck.Java.OK) { Add-Log "Java detectado: v$($script:SystemCheck.Java.Version)" }
-    else { Add-Log "AVISO: Java no detectado" }
-    
-    if ($script:SystemCheck.Minecraft.OK) { Add-Log "Minecraft detectado" }
-    else { Add-Log "ERROR: Minecraft no instalado" }
-    
-    if ($script:SystemCheck.Forge.OK) { Add-Log "Forge detectado: $($script:SystemCheck.Forge.Version)" }
-    else { Add-Log "AVISO: Forge no detectado" }
-    
-    Add-Log "RAM: $($script:SystemCheck.RAM.Total)GB | Disco libre: $($script:SystemCheck.Disk.Free)GB"
-    Add-Log "Sistema verificado"
+    Test-SystemRAM
+    Add-Log "Escaneo completado"
 }
 
-# ==================== UTILITY FUNCTIONS ====================
+# ==================== UTILITIES ====================
 
 function Add-Log { 
     param($msg)
-    $timestamp = Get-Date -Format "HH:mm:ss"
-    $script:Status.Log += "[$timestamp] $msg"
-    if ($script:Status.Log.Count -gt 100) {
-        $script:Status.Log = $script:Status.Log[-50..-1]
-    }
+    $ts = Get-Date -Format "HH:mm:ss"
+    $script:Status.Log += "[$ts] $msg"
+    if ($script:Status.Log.Count -gt 50) { $script:Status.Log = $script:Status.Log[-30..-1] }
 }
 
 function Install-Modpack {
     param([bool]$HighSpec = $false)
     
     $script:Installing = $true
-    $script:Status.Complete = $false
     $script:Status.Phase = "installing"
+    $script:Status.Progress = 0
+    $modeName = if($HighSpec){"Gama Alta"}else{"Gama Baja"}
     
-    $modeName = if($HighSpec) { "GAMA ALTA" } else { "GAMA BAJA" }
-    Add-Log "=== Iniciando instalacion: $modeName ==="
-    $script:Status.Message = "Preparando instalacion..."; $script:Status.Progress = 5
+    Add-Log "=== INSTALANDO: $modeName ==="
     
-    # Verificaciones
-    if (-not $script:SystemCheck.Minecraft.OK) {
-        Add-Log "ERROR: Minecraft no esta instalado"
+    # Check Minecraft
+    $script:Status.Message = "Verificando Minecraft..."
+    $script:Status.SubProgress = "Comprobando instalacion"
+    $script:Status.Progress = 5
+    Start-Sleep -Milliseconds 300
+    
+    if (-not (Test-Path $script:Config.MinecraftPath)) {
+        Add-Log "ERROR: Minecraft no instalado"
         $script:Status.Message = "Error: Instala Minecraft primero"
+        $script:Status.Phase = "error"
         $script:Installing = $false
         return $false
     }
-    
-    if (-not $script:SystemCheck.Disk.OK) {
-        Add-Log "ERROR: Espacio en disco insuficiente"
-        $script:Status.Message = "Error: Necesitas al menos 2GB libres"
-        $script:Installing = $false
-        return $false
-    }
-    
+    Add-Log "Minecraft OK"
     $script:Status.Progress = 10
     
-    # Preparar directorio temporal
+    # Prepare temp
+    $script:Status.Message = "Preparando..."
+    $script:Status.SubProgress = "Creando directorio temporal"
     if (-not (Test-Path $script:Config.TempDir)) { 
         New-Item -ItemType Directory -Path $script:Config.TempDir -Force | Out-Null 
     }
+    $script:Status.Progress = 15
     
-    # Descarga
+    # Download
     $url = if ($HighSpec) { $script:Config.DownloadUrlHigh } else { $script:Config.DownloadUrlLow }
     $zip = "$($script:Config.TempDir)\modpack.zip"
     
-    $script:Status.Message = "Descargando modpack..."; $script:Status.Progress = 15
-    Add-Log "Conectando al servidor de descarga..."
+    $script:Status.Message = "Descargando..."
+    $script:Status.SubProgress = "Conectando al servidor"
+    Add-Log "Iniciando descarga..."
+    $script:Status.Progress = 20
     
     try {
         $wc = New-Object System.Net.WebClient
+        
+        # Progress tracking
+        $script:Status.SubProgress = "Descargando modpack..."
         $wc.DownloadFile($url, $zip)
+        
         Add-Log "Descarga completada"
+        $script:Status.Progress = 55
     } catch {
-        Add-Log "ERROR: Fallo en descarga - $($_.Exception.Message)"
+        Add-Log "ERROR: $($_.Exception.Message)"
         $script:Status.Message = "Error de descarga"
+        $script:Status.Phase = "error"
         $script:Installing = $false
         return $false
     }
     
-    $script:Status.Progress = 50
-    $script:Status.Message = "Preparando archivos..."
-    
-    # Backup de mods existentes
+    # Clean old mods
+    $script:Status.Message = "Limpiando..."
+    $script:Status.SubProgress = "Eliminando mods antiguos"
     $modsPath = "$($script:Config.MinecraftPath)\mods"
     if (Test-Path $modsPath) {
-        $existingMods = Get-ChildItem $modsPath -ErrorAction SilentlyContinue
-        if ($existingMods.Count -gt 0) {
-            Add-Log "Limpiando mods anteriores ($($existingMods.Count) archivos)..."
+        $count = (Get-ChildItem $modsPath -ErrorAction SilentlyContinue).Count
+        if ($count -gt 0) {
+            Add-Log "Eliminando $count mods antiguos..."
             Remove-Item "$modsPath\*" -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
-    
     $script:Status.Progress = 60
-    $script:Status.Message = "Extrayendo archivos..."
+    
+    # Extract
+    $script:Status.Message = "Extrayendo..."
+    $script:Status.SubProgress = "Descomprimiendo archivos"
     Add-Log "Extrayendo modpack..."
     
-    # Extraccion
     $extract = "$($script:Config.TempDir)\extracted"
-    if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
-    Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
+    if (Test-Path $extract) { Remove-Item $extract -Recurse -Force -ErrorAction SilentlyContinue }
     
-    $items = Get-ChildItem -Path $extract
+    try {
+        Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
+    } catch {
+        Add-Log "ERROR: No se pudo extraer"
+        $script:Status.Message = "Error al extraer"
+        $script:Status.Phase = "error"
+        $script:Installing = $false
+        return $false
+    }
+    $script:Status.Progress = 75
+    
+    # Find source folder
+    $items = Get-ChildItem $extract
     $src = if ($items.Count -eq 1 -and $items[0].PSIsContainer) { $items[0].FullName } else { $extract }
     
-    $script:Status.Progress = 75
-    $script:Status.Message = "Instalando mods..."
+    # Copy files
+    $script:Status.Message = "Instalando..."
+    $script:Status.SubProgress = "Copiando archivos"
+    Add-Log "Instalando archivos..."
     
-    # Copiar archivos
-    $filesToCopy = Get-ChildItem -Path $src -Recurse -File
-    Add-Log "Copiando $($filesToCopy.Count) archivos..."
     Copy-Item -Path "$src\*" -Destination $script:Config.MinecraftPath -Recurse -Force
-    
     $script:Status.Progress = 90
-    $script:Status.Message = "Limpiando..."
     
-    # Limpiar temporales
+    # Cleanup
+    $script:Status.Message = "Finalizando..."
+    $script:Status.SubProgress = "Limpiando temporales"
     if (Test-Path $script:Config.TempDir) { 
         Remove-Item $script:Config.TempDir -Recurse -Force -ErrorAction SilentlyContinue 
     }
-    
     $script:Status.Progress = 100
+    
     $script:Status.Message = "Instalacion completada!"
-    $script:Status.Complete = $true
+    $script:Status.SubProgress = "Listo para jugar"
     $script:Status.Phase = "complete"
     Add-Log "=== INSTALACION EXITOSA ==="
-    Add-Log "Puedes cerrar esta ventana y abrir Minecraft"
     
     $script:Installing = $false
     return $true
@@ -256,8 +246,11 @@ function Install-Modpack {
 
 function New-Backup {
     Add-Log "Creando backup..."
-    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $dir = "$env:USERPROFILE\Desktop\PaisaLand_Backup_$timestamp"
+    $script:Status.Message = "Creando backup..."
+    $script:Status.SubProgress = "Copiando archivos"
+    
+    $ts = Get-Date -Format "yyyyMMdd_HHmmss"
+    $dir = "$env:USERPROFILE\Desktop\PaisaLand_Backup_$ts"
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     
     $copied = 0
@@ -269,12 +262,17 @@ function New-Backup {
         }
     }
     
-    Add-Log "Backup creado: $dir ($copied items)"
+    Add-Log "Backup: $dir ($copied items)"
+    $script:Status.Message = "Backup creado"
+    $script:Status.SubProgress = "Guardado en Escritorio"
     return $dir
 }
 
 function Remove-Modpack {
-    Add-Log "Eliminando mods de PaisaLand..."
+    Add-Log "Eliminando mods..."
+    $script:Status.Message = "Eliminando..."
+    $script:Status.SubProgress = "Borrando archivos"
+    
     $removed = 0
     foreach ($item in $script:Config.ManagedFolders) {
         $p = "$($script:Config.MinecraftPath)\$item"
@@ -283,52 +281,47 @@ function Remove-Modpack {
             $removed++
         }
     }
-    Add-Log "Eliminados $removed elementos"
+    
+    Add-Log "Eliminados: $removed elementos"
     $script:Status.Message = "Mods eliminados"
+    $script:Status.SubProgress = "$removed elementos borrados"
 }
 
 function Open-MinecraftLauncher {
-    Add-Log "Buscando Minecraft Launcher..."
+    Add-Log "Abriendo Minecraft..."
+    $script:Status.Message = "Abriendo Minecraft..."
     
-    # Common paths for Minecraft Launcher
-    $launcherPaths = @(
+    $paths = @(
         "$env:ProgramFiles\Minecraft Launcher\MinecraftLauncher.exe",
         "${env:ProgramFiles(x86)}\Minecraft Launcher\MinecraftLauncher.exe",
-        "$env:LOCALAPPDATA\Programs\Minecraft Launcher\MinecraftLauncher.exe",
-        "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Minecraft Launcher\Minecraft Launcher.lnk",
-        "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Minecraft Launcher.lnk"
+        "$env:LOCALAPPDATA\Programs\Minecraft Launcher\MinecraftLauncher.exe"
     )
     
-    foreach ($path in $launcherPaths) {
-        if (Test-Path $path) {
-            Add-Log "Encontrado: $path"
-            Start-Process $path
-            Add-Log "Launcher iniciado"
+    foreach ($p in $paths) {
+        if (Test-Path $p) {
+            Start-Process $p
+            Add-Log "Launcher abierto"
             return $true
         }
     }
     
-    # Search in Start Menu
-    $startMenuSearch = Get-ChildItem -Path "$env:APPDATA\Microsoft\Windows\Start Menu" -Filter "*Minecraft*" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($startMenuSearch) {
-        Add-Log "Encontrado en Start Menu: $($startMenuSearch.Name)"
-        Start-Process $startMenuSearch.FullName
+    # Try Start Menu
+    $link = Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu" -Filter "*Minecraft*" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($link) {
+        Start-Process $link.FullName
+        Add-Log "Launcher abierto desde Start Menu"
         return $true
     }
     
-    # Try shell protocol (works for Microsoft Store version)
-    Add-Log "Intentando protocolo shell..."
+    # Try shell
     try {
         Start-Process "shell:AppsFolder\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft"
-        Add-Log "Launcher iniciado (MS Store)"
+        Add-Log "Launcher abierto (MS Store)"
         return $true
     } catch {}
     
-    # Final fallback - open .minecraft folder
-    Add-Log "No se encontro el launcher - abriendo carpeta .minecraft"
-    if (Test-Path $script:Config.MinecraftPath) {
-        Start-Process "explorer.exe" -ArgumentList $script:Config.MinecraftPath
-    }
+    Add-Log "No se encontro el launcher"
+    $script:Status.Message = "Launcher no encontrado"
     return $false
 }
 
@@ -341,478 +334,628 @@ $HTML = @"
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PaisaLand Installer</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --bg: #0f0f23;
-            --bg2: #1a1a2e;
-            --card: rgba(255,255,255,0.03);
-            --card-border: rgba(255,255,255,0.08);
-            --text: #ffffff;
-            --text2: rgba(255,255,255,0.6);
+            --bg1: #0a0a0f;
+            --bg2: #12121a;
+            --bg3: #1a1a25;
+            --card: rgba(255,255,255,0.02);
+            --border: rgba(255,255,255,0.06);
+            --text1: #ffffff;
+            --text2: rgba(255,255,255,0.7);
             --text3: rgba(255,255,255,0.4);
-            --accent: #10b981;
-            --accent2: #059669;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --info: #3b82f6;
-        }
-        body.light {
-            --bg: #f0f4f8;
-            --bg2: #e2e8f0;
-            --card: rgba(255,255,255,0.8);
-            --card-border: rgba(0,0,0,0.1);
-            --text: #1e293b;
-            --text2: rgba(30,41,59,0.7);
-            --text3: rgba(30,41,59,0.5);
+            --green: #10b981;
+            --green2: #059669;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --blue: #3b82f6;
         }
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, var(--bg) 0%, var(--bg2) 100%);
+            background: var(--bg1);
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
+            color: var(--text1);
+            overflow-x: hidden;
         }
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(circle at 20% 80%, rgba(16,185,129,0.1) 0%, transparent 50%),
-                        radial-gradient(circle at 80% 20%, rgba(59,130,246,0.1) 0%, transparent 50%);
-            pointer-events: none;
-            z-index: -1;
-        }
+        
+        /* Layout */
         .app {
-            width: 100%;
-            max-width: 520px;
-            background: var(--card);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--card-border);
-            border-radius: 24px;
-            overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-            animation: slideUp 0.5s ease;
-        }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 30px 20px;
         }
         
         /* Header */
         .header {
-            padding: 20px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--card-border);
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
         }
-        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
         .brand-icon {
-            width: 48px; height: 48px;
-            background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+            width: 50px; height: 50px;
+            background: linear-gradient(135deg, var(--green), var(--green2));
             border-radius: 14px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px; font-weight: 800; color: white;
-            box-shadow: 0 4px 15px rgba(16,185,129,0.4);
-        }
-        .brand-text { font-size: 22px; font-weight: 700; color: var(--text); }
-        .brand-text span { color: var(--accent); }
-        .header-actions { display: flex; gap: 8px; }
-        .icon-btn {
-            width: 40px; height: 40px;
-            border: 1px solid var(--card-border);
-            background: var(--card);
-            color: var(--text2);
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .icon-btn:hover { background: var(--card-border); color: var(--text); }
-        
-        /* Content */
-        .content { padding: 24px; }
-        
-        /* System Status */
-        .system-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        .status-card {
-            padding: 14px;
-            background: var(--card);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 800;
+            box-shadow: 0 0 30px rgba(16,185,129,0.3);
         }
-        .status-icon {
-            width: 36px; height: 36px;
+        .brand h1 {
+            font-size: 26px;
+            font-weight: 700;
+        }
+        .brand h1 span { color: var(--green); }
+        .server-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
             border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 18px;
-        }
-        .status-icon.ok { background: rgba(16,185,129,0.15); color: var(--accent); }
-        .status-icon.warn { background: rgba(245,158,11,0.15); color: var(--warning); }
-        .status-icon.error { background: rgba(239,68,68,0.15); color: var(--danger); }
-        .status-icon.loading { background: rgba(59,130,246,0.15); color: var(--info); }
-        .status-info h4 { font-size: 13px; font-weight: 600; color: var(--text); }
-        .status-info p { font-size: 11px; color: var(--text3); margin-top: 2px; }
-        
-        /* Server Status Bar */
-        .server-bar {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 16px;
-            background: var(--card);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            margin-bottom: 20px;
+            font-size: 13px;
+            color: var(--text2);
         }
         .server-dot {
-            width: 10px; height: 10px;
+            width: 8px; height: 8px;
             border-radius: 50%;
-            background: var(--danger);
-            animation: pulse 2s infinite;
+            background: var(--red);
         }
-        .server-dot.online { background: var(--accent); }
-        @keyframes pulse { 50% { opacity: 0.5; } }
-        .server-text { font-size: 13px; color: var(--text2); flex: 1; }
-        .server-text strong { color: var(--text); }
+        .server-dot.online { background: var(--green); box-shadow: 0 0 10px var(--green); }
         
-        /* Mode Selector */
-        .mode-section { margin-bottom: 20px; }
-        .section-label {
-            font-size: 11px; font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text3);
-            margin-bottom: 12px;
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 24px;
         }
-        .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .mode-card {
-            padding: 18px;
-            background: var(--card);
-            border: 2px solid var(--card-border);
+        
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .sidebar-card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+        }
+        .sidebar-card h3 {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text3);
+            margin-bottom: 16px;
+        }
+        
+        /* Check items */
+        .check-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .check-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: var(--bg3);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .check-item:hover { background: rgba(255,255,255,0.05); }
+        .check-icon {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        .check-icon.ok { background: rgba(16,185,129,0.15); color: var(--green); }
+        .check-icon.warn { background: rgba(245,158,11,0.15); color: var(--yellow); }
+        .check-icon.error { background: rgba(239,68,68,0.15); color: var(--red); }
+        .check-icon.loading { background: rgba(59,130,246,0.15); color: var(--blue); }
+        .check-info { flex: 1; }
+        .check-info h4 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+        .check-info p { font-size: 11px; color: var(--text3); }
+        .check-arrow { color: var(--text3); }
+        
+        /* Main content */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        /* Version selector */
+        .version-section {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .version-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .version-section p {
+            font-size: 13px;
+            color: var(--text3);
+            margin-bottom: 20px;
+        }
+        .version-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        .version-card {
+            padding: 24px;
+            background: var(--bg3);
+            border: 2px solid transparent;
             border-radius: 14px;
             cursor: pointer;
             transition: all 0.3s;
             text-align: center;
         }
-        .mode-card:hover { border-color: var(--text3); }
-        .mode-card.active { border-color: var(--accent); background: rgba(16,185,129,0.08); }
-        .mode-card i { margin-bottom: 8px; color: var(--text2); }
-        .mode-card.active i { color: var(--accent); }
-        .mode-card h4 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-        .mode-card.active h4 { color: var(--accent); }
-        .mode-card p { font-size: 11px; color: var(--text3); }
+        .version-card:hover { border-color: var(--text3); }
+        .version-card.active { border-color: var(--green); background: rgba(16,185,129,0.08); }
+        .version-card i { color: var(--text3); margin-bottom: 12px; }
+        .version-card.active i { color: var(--green); }
+        .version-card h4 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+        .version-card.active h4 { color: var(--green); }
+        .version-card span { font-size: 12px; color: var(--text3); }
         
-        /* Progress */
+        /* Progress section */
         .progress-section {
-            padding: 18px;
-            background: var(--card);
-            border: 1px solid var(--card-border);
-            border-radius: 14px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .progress-info h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .progress-info p { font-size: 12px; color: var(--text3); }
+        .progress-percent { font-size: 28px; font-weight: 700; color: var(--green); }
+        .progress-bar {
+            height: 10px;
+            background: var(--bg3);
+            border-radius: 5px;
+            overflow: hidden;
             margin-bottom: 20px;
         }
-        .progress-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
-        .progress-status { font-size: 14px; font-weight: 600; color: var(--text); }
-        .progress-percent { font-size: 14px; font-weight: 700; color: var(--accent); }
-        .progress-bar { height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
         .progress-fill {
-            height: 100%; width: 0%;
-            background: linear-gradient(90deg, var(--accent), #34d399);
-            border-radius: 4px;
-            transition: width 0.4s ease;
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--green), #34d399);
+            border-radius: 5px;
+            transition: width 0.3s ease;
         }
-        .progress-fill.active { animation: shimmer 1.5s infinite; }
+        .progress-fill.active {
+            background-size: 200% 100%;
+            animation: shimmer 1.5s linear infinite;
+        }
         @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
         }
         
-        /* Buttons */
-        .btn-primary {
-            width: 100%;
-            padding: 18px;
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
+        /* Action buttons */
+        .action-row {
+            display: flex;
+            gap: 12px;
+        }
+        .btn-install {
+            flex: 1;
+            padding: 18px 24px;
+            background: linear-gradient(135deg, var(--green), var(--green2));
             border: none;
-            border-radius: 14px;
+            border-radius: 12px;
             color: white;
-            font-size: 15px; font-weight: 700;
+            font-size: 15px;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
-            box-shadow: 0 4px 20px rgba(16,185,129,0.3);
-            margin-bottom: 16px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 20px rgba(16,185,129,0.25);
         }
-        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(16,185,129,0.4); }
-        .btn-primary:disabled { background: var(--card-border); color: var(--text3); cursor: not-allowed; box-shadow: none; }
+        .btn-install:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(16,185,129,0.35); }
+        .btn-install:disabled { background: var(--bg3); color: var(--text3); cursor: not-allowed; box-shadow: none; }
+        .btn-install.complete { background: linear-gradient(135deg, var(--blue), #2563eb); box-shadow: 0 4px 20px rgba(59,130,246,0.25); }
         
-        .btn-success {
-            background: linear-gradient(135deg, var(--info), #2563eb);
-            box-shadow: 0 4px 20px rgba(59,130,246,0.3);
-        }
-        .btn-success:hover:not(:disabled) { box-shadow: 0 8px 30px rgba(59,130,246,0.4); }
-        
-        /* Log */
-        .log-section {
-            background: #0d0d14;
-            border: 1px solid var(--card-border);
+        .btn-action {
+            padding: 18px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 12px;
-            height: 120px;
-            overflow-y: auto;
-            margin-bottom: 16px;
-            font-family: 'Consolas', monospace;
-        }
-        body.light .log-section { background: #f1f5f9; }
-        .log-line { font-size: 11px; color: var(--accent); line-height: 1.8; opacity: 0.9; }
-        body.light .log-line { color: #059669; }
-        
-        /* Secondary Actions */
-        .actions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-        .btn-secondary {
-            padding: 12px;
-            background: var(--card);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
             color: var(--text2);
-            font-size: 12px; font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
             display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 6px;
+            justify-content: center;
         }
-        .btn-secondary:hover { background: var(--card-border); color: var(--text); }
-        .btn-secondary.danger { border-color: rgba(239,68,68,0.3); color: var(--danger); }
-        .btn-secondary.danger:hover { background: rgba(239,68,68,0.1); }
+        .btn-action:hover { background: rgba(255,255,255,0.08); color: var(--text1); }
+        .btn-action.danger { border-color: rgba(239,68,68,0.3); color: var(--red); }
+        .btn-action.danger:hover { background: rgba(239,68,68,0.1); }
         
-        /* Footer */
-        .footer {
-            padding: 16px 24px;
-            border-top: 1px solid var(--card-border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        /* Log */
+        .log-section {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
         }
-        .footer-text { font-size: 12px; color: var(--text3); }
-        .footer-text a { color: var(--accent); text-decoration: none; }
-        .version {
-            font-size: 11px;
+        .log-header {
+            padding: 14px 20px;
+            background: var(--bg3);
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            font-weight: 600;
             color: var(--text3);
-            padding: 4px 12px;
-            background: var(--card);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
+        .log-content {
+            padding: 16px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        .log-line {
+            font-size: 11px;
+            color: var(--green);
+            line-height: 1.8;
+            opacity: 0.85;
+        }
+        
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        .modal-overlay.show { opacity: 1; visibility: visible; }
+        .modal {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 450px;
+            width: 90%;
+            transform: translateY(20px);
+            transition: transform 0.3s;
+        }
+        .modal-overlay.show .modal { transform: translateY(0); }
+        .modal-icon {
+            width: 60px; height: 60px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        .modal-icon.error { background: rgba(239,68,68,0.15); color: var(--red); }
+        .modal-icon.warn { background: rgba(245,158,11,0.15); color: var(--yellow); }
+        .modal h2 { font-size: 20px; margin-bottom: 10px; }
+        .modal p { font-size: 14px; color: var(--text2); line-height: 1.6; margin-bottom: 20px; }
+        .modal-link {
+            display: block;
+            padding: 14px 20px;
+            background: var(--green);
+            border-radius: 10px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+        .modal-link:hover { background: var(--green2); }
+        .modal-close {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text2);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .modal-close:hover { background: var(--bg3); }
         
         /* Toast */
         .toast {
             position: fixed;
             bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            padding: 14px 24px;
-            background: var(--text);
-            color: var(--bg);
+            right: 30px;
+            padding: 16px 24px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
             border-radius: 12px;
-            font-size: 14px;
-            font-weight: 500;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateY(100px);
             opacity: 0;
-            transition: all 0.3s ease;
-            z-index: 1000;
+            transition: all 0.3s;
+            z-index: 900;
         }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        .toast.success { background: var(--accent); color: white; }
-        .toast.error { background: var(--danger); color: white; }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { border-color: var(--green); }
+        .toast.error { border-color: var(--red); }
+        .toast-icon { font-size: 18px; }
+        .toast.success .toast-icon { color: var(--green); }
+        .toast.error .toast-icon { color: var(--red); }
+        .toast-text { font-size: 14px; }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .sidebar { order: 2; }
+        }
     </style>
 </head>
 <body>
     <div class="app">
-        <div class="header">
+        <header class="header">
             <div class="brand">
                 <div class="brand-icon">P</div>
-                <div class="brand-text">PAISA<span>LAND</span></div>
+                <h1>PAISA<span>LAND</span></h1>
             </div>
-            <div class="header-actions">
-                <button class="icon-btn" id="themeBtn" title="Cambiar tema">
-                    <i data-feather="moon"></i>
-                </button>
-            </div>
-        </div>
-        
-        <div class="content">
-            <!-- System Status -->
-            <div class="system-grid" id="systemGrid">
-                <div class="status-card">
-                    <div class="status-icon loading" id="javaIcon"><i data-feather="coffee"></i></div>
-                    <div class="status-info">
-                        <h4>Java</h4>
-                        <p id="javaStatus">Verificando...</p>
-                    </div>
-                </div>
-                <div class="status-card">
-                    <div class="status-icon loading" id="mcIcon"><i data-feather="box"></i></div>
-                    <div class="status-info">
-                        <h4>Minecraft</h4>
-                        <p id="mcStatus">Verificando...</p>
-                    </div>
-                </div>
-                <div class="status-card">
-                    <div class="status-icon loading" id="forgeIcon"><i data-feather="tool"></i></div>
-                    <div class="status-info">
-                        <h4>Forge</h4>
-                        <p id="forgeStatus">Verificando...</p>
-                    </div>
-                </div>
-                <div class="status-card">
-                    <div class="status-icon loading" id="ramIcon"><i data-feather="cpu"></i></div>
-                    <div class="status-info">
-                        <h4>Sistema</h4>
-                        <p id="ramStatus">Verificando...</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Server Status -->
-            <div class="server-bar">
+            <div class="server-badge">
                 <div class="server-dot" id="serverDot"></div>
-                <span class="server-text">Servidor: <strong id="serverText">Verificando...</strong></span>
+                <span id="serverText">Verificando...</span>
             </div>
-            
-            <!-- Mode Selection -->
-            <div class="mode-section">
-                <div class="section-label">Selecciona tu version</div>
-                <div class="mode-grid">
-                    <div class="mode-card active" id="modeLow" onclick="selectMode(false)">
-                        <i data-feather="zap"></i>
-                        <h4>Gama Baja</h4>
-                        <p>Optimizado para FPS</p>
-                    </div>
-                    <div class="mode-card" id="modeHigh" onclick="selectMode(true)">
-                        <i data-feather="star"></i>
-                        <h4>Gama Alta</h4>
-                        <p>Shaders + Texturas HD</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Progress -->
-            <div class="progress-section">
-                <div class="progress-header">
-                    <span class="progress-status" id="statusText">Listo para instalar</span>
-                    <span class="progress-percent" id="progressPercent">0%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-            </div>
-            
-            <!-- Main Button -->
-            <button class="btn-primary" id="mainBtn" onclick="install()">
-                <i data-feather="download"></i>
-                <span>Instalar Modpack</span>
-            </button>
-            
-            <!-- Log -->
-            <div class="log-section" id="logBox"></div>
-            
-            <!-- Secondary Actions -->
-            <div class="actions-grid">
-                <button class="btn-secondary" onclick="backup()">
-                    <i data-feather="save"></i>
-                    <span>Backup</span>
-                </button>
-                <button class="btn-secondary" onclick="launch()">
-                    <i data-feather="play"></i>
-                    <span>Jugar</span>
-                </button>
-                <button class="btn-secondary danger" onclick="uninstall()">
-                    <i data-feather="trash-2"></i>
-                    <span>Eliminar</span>
-                </button>
-            </div>
-        </div>
+        </header>
         
-        <div class="footer">
-            <span class="footer-text">Creado por <a href="#">JharlyOk</a></span>
-            <span class="version">v8.0.0</span>
+        <div class="main-grid">
+            <aside class="sidebar">
+                <div class="sidebar-card">
+                    <h3>Estado del Sistema</h3>
+                    <div class="check-list">
+                        <div class="check-item" id="checkJava" onclick="showHelp('java')">
+                            <div class="check-icon loading" id="iconJava"><i data-feather="coffee"></i></div>
+                            <div class="check-info">
+                                <h4>Java</h4>
+                                <p id="statusJava">Verificando...</p>
+                            </div>
+                            <i data-feather="chevron-right" class="check-arrow"></i>
+                        </div>
+                        <div class="check-item" id="checkMC" onclick="showHelp('minecraft')">
+                            <div class="check-icon loading" id="iconMC"><i data-feather="box"></i></div>
+                            <div class="check-info">
+                                <h4>Minecraft</h4>
+                                <p id="statusMC">Verificando...</p>
+                            </div>
+                            <i data-feather="chevron-right" class="check-arrow"></i>
+                        </div>
+                        <div class="check-item" id="checkForge" onclick="showHelp('forge')">
+                            <div class="check-icon loading" id="iconForge"><i data-feather="tool"></i></div>
+                            <div class="check-info">
+                                <h4>Forge</h4>
+                                <p id="statusForge">Verificando...</p>
+                            </div>
+                            <i data-feather="chevron-right" class="check-arrow"></i>
+                        </div>
+                        <div class="check-item" id="checkRAM">
+                            <div class="check-icon loading" id="iconRAM"><i data-feather="cpu"></i></div>
+                            <div class="check-info">
+                                <h4>Memoria RAM</h4>
+                                <p id="statusRAM">Verificando...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="sidebar-card">
+                    <h3>Acciones Rapidas</h3>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button class="btn-action" onclick="backup()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px;">
+                            <i data-feather="save"></i> Crear Backup
+                        </button>
+                        <button class="btn-action" onclick="launch()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px;">
+                            <i data-feather="play"></i> Abrir Minecraft
+                        </button>
+                        <button class="btn-action danger" onclick="uninstall()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px;">
+                            <i data-feather="trash-2"></i> Eliminar Mods
+                        </button>
+                    </div>
+                </div>
+            </aside>
+            
+            <main class="main-content">
+                <div class="version-section">
+                    <h3>Selecciona tu Version</h3>
+                    <p>Elige segun el rendimiento de tu PC</p>
+                    <div class="version-grid">
+                        <div class="version-card active" id="versionLow" onclick="selectVersion(false)">
+                            <i data-feather="zap"></i>
+                            <h4>Gama Baja</h4>
+                            <span>Optimizado para FPS</span>
+                        </div>
+                        <div class="version-card" id="versionHigh" onclick="selectVersion(true)">
+                            <i data-feather="star"></i>
+                            <h4>Gama Alta</h4>
+                            <span>Shaders + Texturas HD</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="progress-section">
+                    <div class="progress-header">
+                        <div class="progress-info">
+                            <h3 id="progressTitle">Listo para instalar</h3>
+                            <p id="progressSub">Selecciona una version y haz clic en Instalar</p>
+                        </div>
+                        <div class="progress-percent" id="progressPercent">0%</div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="action-row">
+                        <button class="btn-install" id="btnInstall" onclick="install()">
+                            <i data-feather="download"></i>
+                            <span>Instalar Modpack</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="log-section">
+                    <div class="log-header">Registro de Actividad</div>
+                    <div class="log-content" id="logBox"></div>
+                </div>
+            </main>
         </div>
     </div>
     
-    <div class="toast" id="toast"></div>
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-icon" id="modalIcon"><i data-feather="alert-circle"></i></div>
+            <h2 id="modalTitle">Ayuda</h2>
+            <p id="modalText">Informacion de ayuda</p>
+            <a class="modal-link" id="modalLink" href="#" target="_blank">Descargar</a>
+            <button class="modal-close" onclick="closeModal()">Cerrar</button>
+        </div>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i data-feather="check-circle" class="toast-icon"></i>
+        <span class="toast-text" id="toastText">Mensaje</span>
+    </div>
     
     <script>
         var API = 'http://localhost:{{PORT}}';
         var isHighSpec = false;
-        var isDark = true;
+        var systemData = {};
         
-        // Init icons
         feather.replace();
         
-        // Theme toggle
-        document.getElementById('themeBtn').onclick = function() {
-            isDark = !isDark;
-            document.body.classList.toggle('light', !isDark);
-            this.innerHTML = isDark ? '<i data-feather="moon"></i>' : '<i data-feather="sun"></i>';
-            feather.replace();
-        };
-        
-        // Mode selection
-        function selectMode(high) {
+        function selectVersion(high) {
             isHighSpec = high;
-            document.getElementById('modeLow').classList.toggle('active', !high);
-            document.getElementById('modeHigh').classList.toggle('active', high);
+            document.getElementById('versionLow').classList.toggle('active', !high);
+            document.getElementById('versionHigh').classList.toggle('active', high);
         }
         
-        // Toast notification
         function showToast(msg, type) {
             var t = document.getElementById('toast');
-            t.textContent = msg;
-            t.className = 'toast ' + (type || '');
-            t.classList.add('show');
+            document.getElementById('toastText').textContent = msg;
+            t.className = 'toast ' + (type || '') + ' show';
             setTimeout(function() { t.classList.remove('show'); }, 3000);
         }
         
-        // Update status
+        var helpData = {
+            java: {
+                icon: 'error',
+                title: 'Java no detectado',
+                text: 'Minecraft necesita Java para funcionar. Descarga e instala Java 17 o superior desde el sitio oficial.',
+                link: 'https://www.oracle.com/java/technologies/downloads/',
+                linkText: 'Descargar Java'
+            },
+            minecraft: {
+                icon: 'error',
+                title: 'Minecraft no encontrado',
+                text: 'No se encontro una instalacion de Minecraft. Descarga el launcher oficial e inicia sesion al menos una vez.',
+                link: 'https://www.minecraft.net/download',
+                linkText: 'Descargar Minecraft'
+            },
+            forge: {
+                icon: 'warn',
+                title: 'Forge no instalado',
+                text: 'Forge es necesario para ejecutar mods. Descarga el instalador de Forge 1.20.1 y ejecutalo.',
+                link: 'https://files.minecraftforge.net/net/minecraftforge/forge/index_1.20.1.html',
+                linkText: 'Descargar Forge'
+            }
+        };
+        
+        function showHelp(type) {
+            if (type === 'java' && systemData.java && systemData.java.ok) return;
+            if (type === 'minecraft' && systemData.minecraft && systemData.minecraft.ok) return;
+            if (type === 'forge' && systemData.forge && systemData.forge.ok) return;
+            
+            var data = helpData[type];
+            if (!data) return;
+            
+            document.getElementById('modalIcon').className = 'modal-icon ' + data.icon;
+            document.getElementById('modalTitle').textContent = data.title;
+            document.getElementById('modalText').textContent = data.text;
+            document.getElementById('modalLink').href = data.link;
+            document.getElementById('modalLink').textContent = data.linkText;
+            document.getElementById('modalOverlay').classList.add('show');
+        }
+        
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('show');
+        }
+        
+        function updateIcon(id, ok) {
+            var el = document.getElementById(id);
+            el.classList.remove('ok', 'warn', 'error', 'loading');
+            el.classList.add(ok ? 'ok' : 'error');
+        }
+        
         function updateStatus() {
             fetch(API + '/status')
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     // Progress
-                    document.getElementById('statusText').textContent = d.message;
+                    document.getElementById('progressTitle').textContent = d.message || 'Listo';
+                    document.getElementById('progressSub').textContent = d.subProgress || '';
                     document.getElementById('progressPercent').textContent = d.progress + '%';
                     document.getElementById('progressFill').style.width = d.progress + '%';
                     
+                    var fill = document.getElementById('progressFill');
+                    var btn = document.getElementById('btnInstall');
+                    
                     if (d.installing) {
-                        document.getElementById('progressFill').classList.add('active');
-                        document.getElementById('mainBtn').disabled = true;
+                        fill.classList.add('active');
+                        btn.disabled = true;
                     } else {
-                        document.getElementById('progressFill').classList.remove('active');
-                        document.getElementById('mainBtn').disabled = false;
+                        fill.classList.remove('active');
+                        btn.disabled = false;
                     }
                     
-                    // Complete state
-                    if (d.complete) {
-                        var btn = document.getElementById('mainBtn');
-                        btn.className = 'btn-primary btn-success';
-                        btn.innerHTML = '<i data-feather="check-circle"></i><span>Completado!</span>';
+                    if (d.phase === 'complete') {
+                        btn.className = 'btn-install complete';
+                        btn.innerHTML = '<i data-feather="check-circle"></i><span>Completado - Listo para jugar!</span>';
                         feather.replace();
                     }
                     
@@ -824,51 +967,43 @@ $HTML = @"
                     
                     // System checks
                     if (d.system) {
-                        updateSystemCard('java', d.system.java);
-                        updateSystemCard('mc', d.system.minecraft);
-                        updateSystemCard('forge', d.system.forge);
-                        updateSystemCard('ram', d.system.ram);
+                        systemData = d.system;
+                        
+                        updateIcon('iconJava', d.system.java.ok);
+                        document.getElementById('statusJava').textContent = d.system.java.msg;
+                        
+                        updateIcon('iconMC', d.system.minecraft.ok);
+                        document.getElementById('statusMC').textContent = d.system.minecraft.msg;
+                        
+                        updateIcon('iconForge', d.system.forge.ok);
+                        document.getElementById('statusForge').textContent = d.system.forge.msg;
+                        
+                        updateIcon('iconRAM', d.system.ram.ok);
+                        document.getElementById('statusRAM').textContent = d.system.ram.msg;
                     }
                     
                     // Log
-                    var logBox = document.getElementById('logBox');
-                    if (d.log && d.log.length > 0) {
-                        logBox.innerHTML = d.log.map(function(l) { 
-                            return '<div class="log-line">' + l + '</div>'; 
-                        }).join('');
-                        logBox.scrollTop = logBox.scrollHeight;
+                    if (d.log && d.log.length) {
+                        var box = document.getElementById('logBox');
+                        box.innerHTML = d.log.map(function(l) { return '<div class="log-line">' + l + '</div>'; }).join('');
+                        box.scrollTop = box.scrollHeight;
                     }
                 })
-                .catch(function(e) {});
+                .catch(function() {});
         }
         
-        function updateSystemCard(type, data) {
-            if (!data) return;
-            var icon = document.getElementById(type + 'Icon');
-            var status = document.getElementById(type + 'Status');
-            if (!icon || !status) return;
-            
-            icon.classList.remove('ok', 'warn', 'error', 'loading');
-            if (data.ok) {
-                icon.classList.add('ok');
-                status.textContent = data.info || 'OK';
-            } else {
-                icon.classList.add('error');
-                status.textContent = data.info || 'No detectado';
-            }
-        }
-        
-        // Actions
         function install() {
-            document.getElementById('mainBtn').disabled = true;
+            var btn = document.getElementById('btnInstall');
+            btn.disabled = true;
             fetch(API + '/install?high=' + isHighSpec, { method: 'POST' })
                 .then(function() { showToast('Instalacion iniciada', 'success'); })
-                .catch(function() { showToast('Error de conexion', 'error'); });
+                .catch(function() { showToast('Error de conexion', 'error'); btn.disabled = false; });
         }
         
         function backup() {
+            showToast('Creando backup...', 'success');
             fetch(API + '/backup', { method: 'POST' })
-                .then(function() { showToast('Backup creado en el escritorio', 'success'); })
+                .then(function() { showToast('Backup guardado en Escritorio', 'success'); })
                 .catch(function() {});
         }
         
@@ -879,15 +1014,15 @@ $HTML = @"
         }
         
         function uninstall() {
-            if (confirm('Eliminar todos los mods de PaisaLand?')) {
+            if (confirm('Eliminar todos los mods de PaisaLand?\n\nEsto eliminara: mods, config, shaders, resourcepacks')) {
                 fetch(API + '/uninstall', { method: 'POST' })
                     .then(function() { showToast('Mods eliminados', 'success'); })
                     .catch(function() {});
             }
         }
         
-        // Start polling
-        setInterval(updateStatus, 1000);
+        // Fast polling - 300ms
+        setInterval(updateStatus, 300);
         updateStatus();
     </script>
 </body>
@@ -902,50 +1037,37 @@ function Start-Installer {
     $listener.Prefixes.Add("http://localhost:$port/")
     
     try { $listener.Start() } catch {
-        Write-Host ""
-        Write-Host "  [ERROR] Puerto $port en uso" -ForegroundColor Red
-        Write-Host ""
+        Write-Host "`n  [ERROR] Puerto $port en uso`n" -ForegroundColor Red
         return
     }
     
-    # Banner
     Write-Host ""
-    Write-Host "  ========================================" -ForegroundColor Cyan
-    Write-Host "       PaisaLand Installer v8.0.0        " -ForegroundColor White
-    Write-Host "  ========================================" -ForegroundColor Cyan
+    Write-Host "  =========================================" -ForegroundColor Cyan
+    Write-Host "       PaisaLand Installer v9.0         " -ForegroundColor White
+    Write-Host "  =========================================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  [OK] Servidor: http://localhost:$port" -ForegroundColor Green
+    Write-Host "  [OK] http://localhost:$port" -ForegroundColor Green
     Write-Host "  [OK] Abriendo navegador..." -ForegroundColor Green
     Write-Host ""
-    Write-Host "  Presiona Ctrl+C para cerrar" -ForegroundColor Yellow
-    Write-Host ""
     
-    # Initial checks
     Invoke-SystemCheck
     $serverStatus = Get-ServerStatus
     
-    # Open browser
-    $htmlPath = "$env:TEMP\paisaland_v8.html"
+    $htmlPath = "$env:TEMP\paisaland_v9.html"
     $HTML.Replace("{{PORT}}", $port) | Out-File -FilePath $htmlPath -Encoding UTF8
     Start-Process $htmlPath
     
-    # Request loop
     while ($listener.IsListening) {
         try {
             $context = $listener.GetContext()
             $request = $context.Request
             $response = $context.Response
             
-            # CORS
             $response.Headers.Add("Access-Control-Allow-Origin", "*")
             $response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             $response.Headers.Add("Access-Control-Allow-Headers", "*")
             
-            if ($request.HttpMethod -eq "OPTIONS") { 
-                $response.StatusCode = 200
-                $response.Close()
-                continue 
-            }
+            if ($request.HttpMethod -eq "OPTIONS") { $response.StatusCode = 200; $response.Close(); continue }
             
             $path = $request.Url.LocalPath
             $result = @{}
@@ -955,16 +1077,16 @@ function Start-Installer {
                     $result = @{
                         message = $script:Status.Message
                         progress = $script:Status.Progress
+                        subProgress = $script:Status.SubProgress
                         log = $script:Status.Log
                         installing = $script:Installing
-                        complete = $script:Status.Complete
                         phase = $script:Status.Phase
                         server = @{ online = $serverStatus.Online; msg = $serverStatus.Message }
                         system = @{
-                            java = @{ ok = $script:SystemCheck.Java.OK; info = if($script:SystemCheck.Java.OK) { "v$($script:SystemCheck.Java.Version)" } else { "No instalado" } }
-                            minecraft = @{ ok = $script:SystemCheck.Minecraft.OK; info = if($script:SystemCheck.Minecraft.OK) { "Detectado" } else { "No encontrado" } }
-                            forge = @{ ok = $script:SystemCheck.Forge.OK; info = if($script:SystemCheck.Forge.OK) { $script:SystemCheck.Forge.Version } else { "No instalado" } }
-                            ram = @{ ok = $script:SystemCheck.RAM.OK; info = "$($script:SystemCheck.RAM.Total)GB RAM" }
+                            java = @{ ok = $script:SystemCheck.Java.OK; msg = $script:SystemCheck.Java.Message }
+                            minecraft = @{ ok = $script:SystemCheck.Minecraft.OK; msg = $script:SystemCheck.Minecraft.Message }
+                            forge = @{ ok = $script:SystemCheck.Forge.OK; msg = $script:SystemCheck.Forge.Message }
+                            ram = @{ ok = $script:SystemCheck.RAM.OK; msg = $script:SystemCheck.RAM.Message }
                         }
                     }
                 }
@@ -975,37 +1097,20 @@ function Start-Installer {
                     }
                     $result = @{ ok = $true }
                 }
-                "/backup" {
-                    $p = New-Backup
-                    $result = @{ ok = $true; path = $p }
-                }
-                "/uninstall" {
-                    Remove-Modpack
-                    $result = @{ ok = $true }
-                }
-                "/launch" {
-                    $ok = Open-MinecraftLauncher
-                    $result = @{ ok = $ok }
-                }
-                "/check" {
-                    Invoke-SystemCheck
-                    $result = @{ ok = $true }
-                }
+                "/backup" { New-Backup; $result = @{ ok = $true } }
+                "/uninstall" { Remove-Modpack; $result = @{ ok = $true } }
+                "/launch" { Open-MinecraftLauncher; $result = @{ ok = $true } }
                 default { $result = @{ error = "404" } }
             }
             
             $json = $result | ConvertTo-Json -Compress -Depth 5
-            $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+            $buf = [System.Text.Encoding]::UTF8.GetBytes($json)
             $response.ContentType = "application/json"
-            $response.ContentLength64 = $buffer.Length
-            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+            $response.ContentLength64 = $buf.Length
+            $response.OutputStream.Write($buf, 0, $buf.Length)
             $response.Close()
-            
-        } catch { 
-            if ($listener.IsListening) { } 
-        }
+        } catch {}
     }
 }
 
-# ==================== START ====================
 Start-Installer
