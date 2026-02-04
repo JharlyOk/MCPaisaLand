@@ -377,29 +377,67 @@ function Open-MinecraftLauncher {
     Add-Log "Abriendo Minecraft..."
     $script:Status.Message = "Abriendo Minecraft..."
     
+    # Official Minecraft Launcher paths
     $paths = @(
         "$env:ProgramFiles\Minecraft Launcher\MinecraftLauncher.exe",
         "${env:ProgramFiles(x86)}\Minecraft Launcher\MinecraftLauncher.exe",
         "$env:LOCALAPPDATA\Programs\Minecraft Launcher\MinecraftLauncher.exe"
     )
     
+    # TLauncher paths
+    $paths += @(
+        "$env:APPDATA\.tlauncher\TLauncher.exe",
+        "$env:USERPROFILE\.tlauncher\TLauncher.exe",
+        "$env:LOCALAPPDATA\TLauncher\TLauncher.exe",
+        "$env:ProgramFiles\TLauncher\TLauncher.exe",
+        "${env:ProgramFiles(x86)}\TLauncher\TLauncher.exe"
+    )
+    
+    # SKLauncher paths
+    $paths += @(
+        "$env:APPDATA\SKLauncher\SKLauncher.exe",
+        "$env:USERPROFILE\SKLauncher\SKLauncher.exe"
+    )
+    
+    # Other popular launchers
+    $paths += @(
+        "$env:LOCALAPPDATA\Programs\PrismLauncher\prismlauncher.exe",
+        "$env:ProgramFiles\PrismLauncher\prismlauncher.exe",
+        "$env:APPDATA\MultiMC\MultiMC.exe",
+        "$env:LOCALAPPDATA\ATLauncher\ATLauncher.exe"
+    )
+    
     foreach ($p in $paths) {
         if (Test-Path $p) {
             Start-Process $p
-            Add-Log "Launcher abierto"
+            Add-Log "Launcher abierto: $p"
             return $true
         }
     }
     
-    # Try Start Menu
-    $link = Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu" -Filter "*Minecraft*" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($link) {
-        Start-Process $link.FullName
-        Add-Log "Launcher abierto desde Start Menu"
-        return $true
+    # Try Start Menu - search for any Minecraft or launcher shortcut
+    $searchTerms = @("*Minecraft*", "*TLauncher*", "*SKLauncher*", "*Prism*", "*MultiMC*")
+    foreach ($term in $searchTerms) {
+        $link = Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu" -Filter $term -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($link) {
+            Start-Process $link.FullName
+            Add-Log "Launcher abierto desde Start Menu: $($link.Name)"
+            return $true
+        }
     }
     
-    # Try shell
+    # Also check Desktop for launcher shortcuts
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    foreach ($term in $searchTerms) {
+        $link = Get-ChildItem $desktop -Filter $term -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($link) {
+            Start-Process $link.FullName
+            Add-Log "Launcher abierto desde Escritorio: $($link.Name)"
+            return $true
+        }
+    }
+    
+    # Try MS Store app
     try {
         Start-Process "shell:AppsFolder\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft"
         Add-Log "Launcher abierto (MS Store)"
@@ -407,7 +445,7 @@ function Open-MinecraftLauncher {
     } catch {}
     
     Add-Log "No se encontro el launcher"
-    $script:Status.Message = "Launcher no encontrado"
+    $script:Status.Message = "Launcher no encontrado - Abrelo manualmente"
     return $false
 }
 
