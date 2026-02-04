@@ -11,8 +11,8 @@ $script:Config = @{
     DownloadUrlLow = "https://www.dropbox.com/scl/fi/0uq96jnx7a3tsfwz79mrg/PC-Gama-Baja.zip?rlkey=oi5am56nw8aihcixj709ksgri&st=id22tog3&dl=1"
     DownloadUrlHigh = "https://www.dropbox.com/scl/fi/mdqsni1k9ht8fuadv9kzd/PC-Gama-Alta.zip?rlkey=wgn6buj6qrnmxeqjsp03by4k5&st=wr6czevh&dl=1"
     ForgeInstallerUrl = "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-installer.jar"
-    ServerIP = "play.paisaland.com"
-    ServerPort = 25565
+    ServerIP = "199.127.62.118"
+    ServerPort = 25610
     MinecraftPath = "$env:APPDATA\.minecraft"
     TempDir = "$env:TEMP\PaisaLandInstaller"
     ManagedFolders = @("mods", "config", "shaderpacks", "resourcepacks", "emotes")
@@ -169,9 +169,19 @@ function Install-Modpack {
     try {
         $wc = New-Object System.Net.WebClient
         
-        # Progress tracking
+        # Download with progress using events
         $script:Status.SubProgress = "Descargando modpack..."
-        $wc.DownloadFile($url, $zip)
+        
+        # Use async download with progress
+        Register-ObjectEvent -InputObject $wc -EventName DownloadProgressChanged -Action {
+            $percent = $Event.SourceEventArgs.ProgressPercentage
+            # Map 0-100% to 20-55%
+            $script:Status.Progress = 20 + [int]($percent * 0.35)
+            $script:Status.SubProgress = "Descargando... $percent%"
+        } | Out-Null
+        
+        $wc.DownloadFileTaskAsync($url, $zip).Wait()
+        Get-EventSubscriber | Where-Object { $_.SourceObject -eq $wc } | Unregister-Event
         
         Add-Log "Descarga completada"
         $script:Status.Progress = 55
@@ -621,7 +631,7 @@ $HTML = @"
         }
         .btn-install:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(16,185,129,0.35); }
         .btn-install:disabled { background: var(--bg3); color: var(--text3); cursor: not-allowed; box-shadow: none; }
-        .btn-install.complete { background: linear-gradient(135deg, var(--blue), #2563eb); box-shadow: 0 4px 20px rgba(59,130,246,0.25); }
+        .btn-install.complete { background: linear-gradient(135deg, #047857, #065f46); box-shadow: 0 4px 20px rgba(4,120,87,0.35); }
         
         .btn-action {
             padding: 18px;
@@ -1042,7 +1052,7 @@ $HTML = @"
             document.getElementById('progressFill').style.width = '0%';
             document.getElementById('progressPercent').textContent = '0%';
             document.getElementById('progressTitle').textContent = 'Listo para instalar';
-            document.getElementById('progressSub').textContent = '';
+            document.getElementById('progressSub').textContent = 'Selecciona una version y haz clic en Instalar';
             feather.replace();
             fetch(API + '/reset', { method: 'POST' }).catch(function(){});
         }
@@ -1309,9 +1319,9 @@ function Start-Installer {
                 "/backup" { New-Backup; $result = @{ ok = $true } }
                 "/uninstall" { Remove-Modpack; $result = @{ ok = $true } }
                 "/reset" {
-                    $script:Status.Message = "Listo"
+                    $script:Status.Message = "Listo para instalar"
                     $script:Status.Progress = 0
-                    $script:Status.SubProgress = ""
+                    $script:Status.SubProgress = "Selecciona una version y haz clic en Instalar"
                     $script:Status.Phase = "ready"
                     $result = @{ ok = $true }
                 }
