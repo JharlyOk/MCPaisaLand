@@ -1,28 +1,22 @@
 # ==============================================================================================
-# PaisaLand Installer v5.0.0 - WOOTING-INSPIRED DESIGN
-# Compatible: Windows PowerShell 5.1+, irm ... | iex
+# PaisaLand Installer v6.0.0 - HTML + Browser UI
+# Compatible con: irm https://... | iex
 # ==============================================================================================
 
-Add-Type -AssemblyName PresentationFramework
-Add-Type -AssemblyName PresentationCore
-Add-Type -AssemblyName WindowsBase
-Add-Type -AssemblyName System.Windows.Forms
-
-# ==================== CONFIG ====================
 $script:Config = @{
-    Version = "5.0.0"
+    Version = "6.0.0"
+    Port = 8199
     DownloadUrlLow = "https://www.dropbox.com/scl/fi/0uq96jnx7a3tsfwz79mrg/PC-Gama-Baja.zip?rlkey=oi5am56nw8aihcixj709ksgri&st=id22tog3&dl=1"
     DownloadUrlHigh = "https://www.dropbox.com/scl/fi/mdqsni1k9ht8fuadv9kzd/PC-Gama-Alta.zip?rlkey=wgn6buj6qrnmxeqjsp03by4k5&st=wr6czevh&dl=1"
     ServerIP = "play.paisaland.com"
     ServerPort = 25565
     MinecraftPath = "$env:APPDATA\.minecraft"
     TempDir = "$env:TEMP\PaisaLandInstaller"
-    PrefsFile = "$env:APPDATA\PaisaLand\prefs.txt"
     ManagedFolders = @("mods", "config", "shaderpacks", "resourcepacks", "emotes", "options.txt", "servers.dat")
 }
 
-$script:IsDarkMode = $true
-$script:IsHighSpec = $false
+$script:Status = @{ Message = "Listo"; Progress = 0; Log = @("Instalador iniciado") }
+$script:Installing = $false
 
 # ==================== FUNCTIONS ====================
 function Test-MinecraftInstalled { return (Test-Path $script:Config.MinecraftPath) }
@@ -32,229 +26,460 @@ function Get-ServerStatus {
     try {
         $tcp = New-Object System.Net.Sockets.TcpClient
         $ar = $tcp.BeginConnect($script:Config.ServerIP, $script:Config.ServerPort, $null, $null)
-        if ($ar.AsyncWaitHandle.WaitOne(2000, $false) -and $tcp.Connected) { $tcp.Close(); return @{ Online = $true; Msg = "En Línea" } }
-        return @{ Online = $false; Msg = "Fuera de Línea" }
-    } catch { return @{ Online = $false; Msg = "Error" } }
+        if ($ar.AsyncWaitHandle.WaitOne(2000, $false) -and $tcp.Connected) { $tcp.Close(); return @{ Online = $true; Message = "En Línea" } }
+        return @{ Online = $false; Message = "Fuera de Línea" }
+    } catch { return @{ Online = $false; Message = "Error" } }
 }
 
-function Save-Pref { param($K,$V); $dir = Split-Path $script:Config.PrefsFile -Parent; if (-not (Test-Path $dir)) { mkdir $dir -Force | Out-Null }; "$K=$V" | Out-File -Append $script:Config.PrefsFile }
-function Get-Pref { param($K,$D=$null); if (Test-Path $script:Config.PrefsFile) { $lines = Get-Content $script:Config.PrefsFile; foreach($l in $lines) { if ($l -like "$K=*") { return $l.Split("=")[1] } } }; return $D }
+function Add-Log { param($msg); $script:Status.Log += $msg }
 
-function Install-Modpack { param($ZipPath)
-    $extract = "$($script:Config.TempDir)\ex"
+function Install-Modpack {
+    param([bool]$HighSpec = $false)
+    
+    $script:Installing = $true
+    $script:Status.Message = "Verificando..."; $script:Status.Progress = 5
+    Add-Log "Modo: $(if($HighSpec){'GAMA ALTA'}else{'GAMA BAJA'})"
+    
+    if (-not (Test-MinecraftInstalled)) { Add-Log "ERROR: .minecraft no encontrado"; $script:Installing = $false; return $false }
+    Add-Log "Minecraft OK"; $script:Status.Progress = 10
+    
+    if (-not (Test-DiskSpace)) { Add-Log "ERROR: Sin espacio"; $script:Installing = $false; return $false }
+    Add-Log "Espacio OK"; $script:Status.Progress = 20
+    
+    $url = if ($HighSpec) { $script:Config.DownloadUrlHigh } else { $script:Config.DownloadUrlLow }
+    $zip = "$($script:Config.TempDir)\mods.zip"
+    
+    if (-not (Test-Path $script:Config.TempDir)) { New-Item -ItemType Directory -Path $script:Config.TempDir -Force | Out-Null }
+    
+    $script:Status.Message = "Descargando..."; Add-Log "Descargando..."
+    try { (New-Object System.Net.WebClient).DownloadFile($url, $zip) } catch { Add-Log "ERROR: $($_.Exception.Message)"; $script:Installing = $false; return $false }
+    Add-Log "Descarga completa"; $script:Status.Progress = 50
+    
+    $script:Status.Message = "Instalando..."
     $modsPath = "$($script:Config.MinecraftPath)\mods"
     if (Test-Path $modsPath) { Remove-Item "$modsPath\*" -Recurse -Force -ErrorAction SilentlyContinue }
-    Expand-Archive -LiteralPath $ZipPath -DestinationPath $extract -Force
+    
+    $extract = "$($script:Config.TempDir)\ex"
+    Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
     $items = Get-ChildItem -Path $extract
     $src = if ($items.Count -eq 1 -and $items[0].PSIsContainer) { $items[0].FullName } else { $extract }
     Copy-Item -Path "$src\*" -Destination $script:Config.MinecraftPath -Recurse -Force
+    Add-Log "Archivos copiados"; $script:Status.Progress = 90
+    
+    if (Test-Path $script:Config.TempDir) { Remove-Item $script:Config.TempDir -Recurse -Force -ErrorAction SilentlyContinue }
+    
+    $script:Status.Message = "¡COMPLETADO!"; $script:Status.Progress = 100
+    Add-Log "¡Instalación exitosa!"
+    $script:Installing = $false
+    return $true
 }
 
 function New-Backup {
     $dir = "$env:USERPROFILE\Desktop\PaisaLand_Backup_$(Get-Date -Format 'yyyyMMdd_HHmm')"
-    mkdir $dir -Force | Out-Null
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
     foreach ($item in $script:Config.ManagedFolders) { $p = "$($script:Config.MinecraftPath)\$item"; if (Test-Path $p) { Copy-Item -Path $p -Destination $dir -Recurse } }
+    Add-Log "Backup creado: $dir"
     return $dir
 }
 
-function Remove-Modpack { foreach ($item in $script:Config.ManagedFolders) { $p = "$($script:Config.MinecraftPath)\$item"; if (Test-Path $p) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue } } }
-function Clear-TempFiles { if (Test-Path $script:Config.TempDir) { Remove-Item $script:Config.TempDir -Recurse -Force -ErrorAction SilentlyContinue } }
-
-# ==================== XAML ====================
-function Get-XAML {
-    param([bool]$Dark = $true)
-    $bg = if($Dark){"#2D2D30"}else{"#FFFFFF"}
-    $card = if($Dark){"#1E1E1E"}else{"#F5F5F5"}
-    $txt = if($Dark){"#FFFFFF"}else{"#1A1A1A"}
-    $sub = if($Dark){"#888888"}else{"#666666"}
-    $bdr = if($Dark){"#404040"}else{"#E0E0E0"}
-    $acc = "#4CAF50"
-    $themeIcon = if($Dark){"☀"}else{"🌙"}
-
-    return @"
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="PaisaLand" Height="480" Width="440"
-        WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent"
-        WindowStartupLocation="CenterScreen">
-    <Border CornerRadius="10" Background="$bg" BorderBrush="$bdr" BorderThickness="1">
-        <Border.Effect><DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/></Border.Effect>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="45"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="40"/>
-            </Grid.RowDefinitions>
-
-            <!-- HEADER -->
-            <Border Grid.Row="0" Name="DragZone" Background="Transparent">
-                <Grid>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                        <TextBlock Text="🎮 " FontSize="16"/>
-                        <TextBlock Text="PAISA" FontSize="14" FontWeight="Bold" Foreground="$txt"/>
-                        <TextBlock Text="LAND" FontSize="14" FontWeight="Bold" Foreground="$acc"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,5,0">
-                        <Button Name="BtnTheme" Content="$themeIcon" Width="32" Height="32" Background="Transparent" BorderThickness="0" Foreground="$sub" FontSize="14" Cursor="Hand" ToolTip="Cambiar tema"/>
-                        <Button Name="BtnMin" Content="─" Width="32" Height="32" Background="Transparent" BorderThickness="0" Foreground="$sub" FontSize="12" Cursor="Hand"/>
-                        <Button Name="BtnClose" Content="✕" Width="32" Height="32" Background="Transparent" BorderThickness="0" Foreground="$sub" FontSize="12" FontWeight="Bold" Cursor="Hand"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <!-- CONTENT -->
-            <StackPanel Grid.Row="1" Margin="15,5,15,5">
-                <!-- Toggle Card -->
-                <Border Background="$card" CornerRadius="8" Padding="15" Margin="0,0,0,10">
-                    <Grid>
-                        <StackPanel>
-                            <TextBlock Text="Gama Alta" FontSize="14" FontWeight="SemiBold" Foreground="$txt"/>
-                            <TextBlock Text="Shaders + Texturas HD" FontSize="11" Foreground="$sub" Margin="0,4,0,0"/>
-                        </StackPanel>
-                        <CheckBox Name="ChkHigh" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand"/>
-                    </Grid>
-                </Border>
-
-                <!-- Status Card -->
-                <Border Background="$card" CornerRadius="8" Padding="12" Margin="0,0,0,10">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Name="ServerDot" Width="8" Height="8" Fill="#E53935"/>
-                            <TextBlock Name="ServerTxt" Text="Servidor: ..." Foreground="$sub" FontSize="11" Margin="6,0,0,0"/>
-                        </StackPanel>
-                        <TextBlock Name="StatusTxt" Text="Listo" Foreground="$txt" FontSize="13" Margin="0,8,0,0"/>
-                        <ProgressBar Name="Progress" Height="3" Background="#333" Foreground="$acc" BorderThickness="0" Margin="0,8,0,0" Value="0"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Install Button -->
-                <Button Name="BtnInstall" Height="42" Background="$acc" Foreground="White" FontSize="13" FontWeight="SemiBold" Cursor="Hand" BorderThickness="0">
-                    <Button.Content>⬇  INSTALAR</Button.Content>
-                </Button>
-
-                <!-- Log -->
-                <Border Background="#0A0A0A" CornerRadius="5" Padding="8" Margin="0,10,0,0" Height="70">
-                    <ScrollViewer Name="LogScroll" VerticalScrollBarVisibility="Auto">
-                        <TextBlock Name="LogTxt" Text="> PaisaLand v5.0" Foreground="#00DD00" FontFamily="Consolas" FontSize="10" TextWrapping="Wrap"/>
-                    </ScrollViewer>
-                </Border>
-
-                <!-- Secondary Buttons -->
-                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                    <Button Name="BtnBackup" Content="📁 Backup" Background="Transparent" BorderBrush="$bdr" BorderThickness="1" Foreground="$sub" Padding="10,6" Cursor="Hand" Margin="0,0,8,0"/>
-                    <Button Name="BtnUninstall" Content="🗑 Eliminar" Background="Transparent" BorderBrush="#E53935" BorderThickness="1" Foreground="#E53935" Padding="10,6" Cursor="Hand"/>
-                </StackPanel>
-            </StackPanel>
-
-            <!-- FOOTER -->
-            <Border Grid.Row="2" BorderBrush="$bdr" BorderThickness="0,1,0,0" Padding="12,0">
-                <Grid VerticalAlignment="Center">
-                    <TextBlock Text="by JharlyOk" Foreground="$sub" FontSize="10" HorizontalAlignment="Center"/>
-                    <TextBlock Text="v5.0.0" Foreground="$sub" FontSize="10" HorizontalAlignment="Right"/>
-                </Grid>
-            </Border>
-        </Grid>
-    </Border>
-</Window>
-"@
+function Remove-Modpack {
+    foreach ($item in $script:Config.ManagedFolders) { $p = "$($script:Config.MinecraftPath)\$item"; if (Test-Path $p) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue } }
+    Add-Log "Mods eliminados"
 }
 
-# ==================== SHOW WINDOW ====================
-function Show-App {
-    param([bool]$Dark = $true)
+# ==================== HTML ====================
+$HTML = @'
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaisaLand Installer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #1a1a1d;
+            --card: #25252a;
+            --text: #ffffff;
+            --subtext: #8b8b8b;
+            --border: #3a3a40;
+            --accent: #4ade80;
+            --accent-hover: #22c55e;
+            --danger: #ef4444;
+        }
+        .light {
+            --bg: #f5f5f7;
+            --card: #ffffff;
+            --text: #1a1a1d;
+            --subtext: #6b6b6b;
+            --border: #e0e0e0;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .container {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card);
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .header {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .logo { display: flex; align-items: center; gap: 8px; }
+        .logo-icon { font-size: 24px; }
+        .logo-text { font-weight: 700; font-size: 16px; }
+        .logo-text span { color: var(--accent); }
+        .header-actions { display: flex; gap: 8px; }
+        .icon-btn {
+            width: 32px; height: 32px;
+            border: none; background: transparent;
+            color: var(--subtext);
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .icon-btn:hover { background: var(--border); color: var(--text); }
+        .content { padding: 20px; }
+        .card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .toggle-info h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .toggle-info p { font-size: 12px; color: var(--subtext); }
+        .toggle {
+            width: 48px; height: 26px;
+            background: #555;
+            border-radius: 13px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s;
+        }
+        .toggle.active { background: var(--accent); }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px; height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 3px; left: 3px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .toggle.active::after { left: 25px; }
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+        }
+        .status-dot.online { background: var(--accent); }
+        .status-text { font-size: 12px; color: var(--subtext); }
+        .progress-text { font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+        .progress-bar {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 16px;
+        }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-primary:disabled { background: #555; color: #888; cursor: not-allowed; transform: none; }
+        .log-box {
+            background: #0d0d0d;
+            border-radius: 8px;
+            padding: 12px;
+            height: 80px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            color: #4ade80;
+            margin-bottom: 16px;
+        }
+        .log-box p { margin: 2px 0; }
+        .secondary-actions { display: flex; gap: 10px; }
+        .btn-secondary {
+            flex: 1;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--subtext);
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover { border-color: var(--text); color: var(--text); }
+        .btn-danger { border-color: var(--danger); color: var(--danger); }
+        .btn-danger:hover { background: var(--danger); color: white; }
+        .footer {
+            padding: 12px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--subtext);
+        }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .installing .progress-fill { animation: pulse 1s infinite; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <span class="logo-icon">🎮</span>
+                <span class="logo-text">PAISA<span>LAND</span></span>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" id="themeBtn" title="Cambiar tema">🌙</button>
+            </div>
+        </div>
+        <div class="content">
+            <div class="card">
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <h3>Gama Alta</h3>
+                        <p>Shaders + Texturas HD + Efectos</p>
+                    </div>
+                    <div class="toggle" id="specToggle"></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="status-row">
+                    <div class="status-dot" id="serverDot"></div>
+                    <span class="status-text" id="serverText">Servidor: Verificando...</span>
+                </div>
+                <p class="progress-text" id="statusText">Listo para instalar</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+            <button class="btn-primary" id="installBtn">⬇️ INSTALAR MODPACK</button>
+            <div class="log-box" id="logBox"><p>> Instalador PaisaLand v6.0</p></div>
+            <div class="secondary-actions">
+                <button class="btn-secondary" id="backupBtn">📁 Backup</button>
+                <button class="btn-secondary btn-danger" id="uninstallBtn">🗑️ Eliminar</button>
+            </div>
+        </div>
+        <div class="footer">
+            <span>by JharlyOk</span>
+            <span>v6.0.0</span>
+        </div>
+    </div>
+    <script>
+        const API = 'http://localhost:{{PORT}}';
+        let isHigh = false, isDark = true;
+
+        // Theme
+        document.getElementById('themeBtn').onclick = () => {
+            isDark = !isDark;
+            document.body.classList.toggle('light', !isDark);
+            document.getElementById('themeBtn').textContent = isDark ? '🌙' : '☀️';
+        };
+
+        // Toggle
+        document.getElementById('specToggle').onclick = (e) => {
+            isHigh = !isHigh;
+            e.target.classList.toggle('active', isHigh);
+        };
+
+        // Status polling
+        async function updateStatus() {
+            try {
+                const res = await fetch(API + '/status');
+                const data = await res.json();
+                document.getElementById('statusText').textContent = data.message;
+                document.getElementById('progressFill').style.width = data.progress + '%';
+                if (data.server) {
+                    document.getElementById('serverDot').classList.toggle('online', data.server.online);
+                    document.getElementById('serverText').textContent = 'Servidor: ' + data.server.msg;
+                }
+                const logBox = document.getElementById('logBox');
+                logBox.innerHTML = data.log.map(l => '<p>> ' + l + '</p>').join('');
+                logBox.scrollTop = logBox.scrollHeight;
+            } catch(e) {}
+        }
+        setInterval(updateStatus, 1000);
+        updateStatus();
+
+        // Install
+        document.getElementById('installBtn').onclick = async () => {
+            document.getElementById('installBtn').disabled = true;
+            try {
+                await fetch(API + '/install?high=' + isHigh, { method: 'POST' });
+            } catch(e) {}
+            setTimeout(() => document.getElementById('installBtn').disabled = false, 3000);
+        };
+
+        // Backup
+        document.getElementById('backupBtn').onclick = async () => {
+            await fetch(API + '/backup', { method: 'POST' });
+        };
+
+        // Uninstall
+        document.getElementById('uninstallBtn').onclick = async () => {
+            if (confirm('¿Eliminar todos los mods de PaisaLand?')) {
+                await fetch(API + '/uninstall', { method: 'POST' });
+            }
+        };
+    </script>
+</body>
+</html>
+'@
+
+# ==================== HTTP SERVER ====================
+function Start-Installer {
+    $port = $script:Config.Port
+    $listener = New-Object System.Net.HttpListener
+    $listener.Prefixes.Add("http://localhost:$port/")
     
-    $xaml = Get-XAML -Dark $Dark
-    [xml]$x = $xaml
-    $reader = New-Object System.Xml.XmlNodeReader $x
-    $win = [Windows.Markup.XamlReader]::Load($reader)
+    try { $listener.Start() } catch {
+        Write-Host "Error: No se pudo iniciar el servidor en puerto $port" -ForegroundColor Red
+        return
+    }
     
-    # Controls
-    $dragZone = $win.FindName("DragZone")
-    $btnTheme = $win.FindName("BtnTheme")
-    $btnMin = $win.FindName("BtnMin")
-    $btnClose = $win.FindName("BtnClose")
-    $chkHigh = $win.FindName("ChkHigh")
-    $serverDot = $win.FindName("ServerDot")
-    $serverTxt = $win.FindName("ServerTxt")
-    $statusTxt = $win.FindName("StatusTxt")
-    $progress = $win.FindName("Progress")
-    $btnInstall = $win.FindName("BtnInstall")
-    $logScroll = $win.FindName("LogScroll")
-    $logTxt = $win.FindName("LogTxt")
-    $btnBackup = $win.FindName("BtnBackup")
-    $btnUninstall = $win.FindName("BtnUninstall")
+    Write-Host ""
+    Write-Host "  =====================================" -ForegroundColor Green
+    Write-Host "   PaisaLand Installer v6.0" -ForegroundColor White
+    Write-Host "  =====================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Servidor iniciado en: http://localhost:$port" -ForegroundColor Cyan
+    Write-Host "  Abriendo navegador..." -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  [Presiona Ctrl+C para cerrar]" -ForegroundColor Yellow
+    Write-Host ""
     
-    # Helpers
-    $log = { param($m); $logTxt.Text += "`n> $m"; $logScroll.ScrollToEnd(); [System.Windows.Forms.Application]::DoEvents() }
-    $status = { param($m); $statusTxt.Text = $m; [System.Windows.Forms.Application]::DoEvents() }
-    $prog = { param($v); $progress.Value = $v; [System.Windows.Forms.Application]::DoEvents() }
+    # Check server status
+    $serverStatus = Get-ServerStatus
     
-    # Window Events
-    $dragZone.Add_MouseLeftButtonDown({ $win.DragMove() })
-    $btnClose.Add_Click({ $win.Close() })
-    $btnMin.Add_Click({ $win.WindowState = "Minimized" })
+    # Open browser with HTML
+    $htmlPath = "$env:TEMP\paisaland_installer.html"
+    $HTML.Replace("{{PORT}}", $port) | Out-File -FilePath $htmlPath -Encoding UTF8
+    Start-Process $htmlPath
     
-    # Theme Toggle
-    $btnTheme.Add_Click({
-        $script:IsDarkMode = -not $script:IsDarkMode
-        $win.Close()
-        Show-App -Dark $script:IsDarkMode
-    }.GetNewClosure())
-    
-    # Install
-    $btnInstall.Add_Click({
-        $btnInstall.IsEnabled = $false
+    # Main loop
+    while ($listener.IsListening) {
         try {
-            $url = if ($chkHigh.IsChecked) { $script:Config.DownloadUrlHigh } else { $script:Config.DownloadUrlLow }
-            & $log "Modo: $(if($chkHigh.IsChecked){'ALTA'}else{'BAJA'})"
+            $context = $listener.GetContext()
+            $request = $context.Request
+            $response = $context.Response
             
-            & $status "Verificando..."; if (-not (Test-MinecraftInstalled)) { [System.Windows.MessageBox]::Show("No se encontró .minecraft"); return }
-            & $log "Minecraft OK"; & $prog 10
+            # CORS
+            $response.Headers.Add("Access-Control-Allow-Origin", "*")
+            $response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            $response.Headers.Add("Access-Control-Allow-Headers", "*")
             
-            & $status "Espacio..."; if (-not (Test-DiskSpace)) { [System.Windows.MessageBox]::Show("Sin espacio"); return }
-            & $log "Espacio OK"; & $prog 20
+            if ($request.HttpMethod -eq "OPTIONS") {
+                $response.StatusCode = 200
+                $response.Close()
+                continue
+            }
             
-            $zip = "$($script:Config.TempDir)\m.zip"; if (-not (Test-Path $script:Config.TempDir)) { mkdir $script:Config.TempDir -Force | Out-Null }
-            & $status "Descargando..."; & $log "Descargando..."
-            $progress.IsIndeterminate = $true; [System.Windows.Forms.Application]::DoEvents()
-            (New-Object System.Net.WebClient).DownloadFile($url, $zip)
-            $progress.IsIndeterminate = $false; & $prog 50; & $log "OK"
+            $path = $request.Url.LocalPath
+            $result = @{}
             
-            & $status "Instalando..."; & $log "Extrayendo..."
-            Install-Modpack -ZipPath $zip; & $prog 90
+            switch ($path) {
+                "/status" {
+                    $result = @{
+                        message = $script:Status.Message
+                        progress = $script:Status.Progress
+                        log = $script:Status.Log
+                        installing = $script:Installing
+                        server = @{ online = $serverStatus.Online; msg = $serverStatus.Message }
+                    }
+                }
+                "/install" {
+                    if (-not $script:Installing) {
+                        $high = $request.QueryString["high"] -eq "true"
+                        Start-Job -ScriptBlock {
+                            param($cfg, $high)
+                            # Note: In actual use, this runs in main thread due to variable scope
+                        } -ArgumentList $script:Config, $high | Out-Null
+                        Install-Modpack -HighSpec $high
+                    }
+                    $result = @{ ok = $true }
+                }
+                "/backup" {
+                    $path = New-Backup
+                    $result = @{ ok = $true; path = $path }
+                }
+                "/uninstall" {
+                    Remove-Modpack
+                    $script:Status.Message = "Mods eliminados"
+                    $result = @{ ok = $true }
+                }
+                "/shutdown" {
+                    $result = @{ ok = $true }
+                    $listener.Stop()
+                }
+                default {
+                    $result = @{ error = "Not found" }
+                }
+            }
             
-            Clear-TempFiles; & $prog 100
-            & $status "¡LISTO!"; $statusTxt.Foreground = [System.Windows.Media.Brushes]::LimeGreen
-            & $log "Completado!"
-            [System.Windows.MessageBox]::Show("¡Instalado!", "PaisaLand")
-        } catch { & $log "ERROR: $($_.Exception.Message)"; [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)") }
-        finally { $btnInstall.IsEnabled = $true; $progress.IsIndeterminate = $false }
-    }.GetNewClosure())
-    
-    # Backup
-    $btnBackup.Add_Click({
-        try { & $status "Backup..."; & $log "Creando..."; $p = New-Backup; & $log "OK: $p"; & $status "Backup OK"; [System.Windows.MessageBox]::Show("Backup creado") }
-        catch { & $log "Error: $($_.Exception.Message)" }
-    }.GetNewClosure())
-    
-    # Uninstall
-    $btnUninstall.Add_Click({
-        $r = [System.Windows.MessageBox]::Show("¿Eliminar mods?", "Confirmar", "YesNo", "Warning")
-        if ($r -eq "Yes") { try { & $status "Eliminando..."; Remove-Modpack; & $log "Eliminado"; & $status "OK"; [System.Windows.MessageBox]::Show("Mods eliminados") } catch { & $log "Error" } }
-    }.GetNewClosure())
-    
-    # Init
-    $win.Add_Loaded({
-        & $log "Verificando servidor..."
-        $s = Get-ServerStatus
-        if ($s.Online) { $serverDot.Fill = [System.Windows.Media.Brushes]::LimeGreen; $serverTxt.Text = "Servidor: $($s.Msg)"; $serverTxt.Foreground = [System.Windows.Media.Brushes]::LimeGreen }
-        else { $serverDot.Fill = [System.Windows.Media.Brushes]::Red; $serverTxt.Text = "Servidor: $($s.Msg)" }
-        & $log "Listo"
-    }.GetNewClosure())
-    
-    [void]$win.ShowDialog()
+            $json = $result | ConvertTo-Json -Compress
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+            $response.ContentType = "application/json"
+            $response.ContentLength64 = $buffer.Length
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+            $response.Close()
+            
+        } catch {
+            if ($listener.IsListening) {
+                Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+    }
 }
 
 # ==================== START ====================
-$script:IsDarkMode = $true
-Show-App -Dark $script:IsDarkMode
+Start-Installer
