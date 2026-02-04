@@ -26,11 +26,14 @@ $script:Status = @{
     SubProgress = ""
 }
 $script:SystemCheck = @{
-    Java = @{ OK = $false; Version = ""; Message = "" }
-    Minecraft = @{ OK = $false; Message = "" }
-    Forge = @{ OK = $false; Version = ""; Message = "" }
-    RAM = @{ OK = $false; Total = 0; Message = "" }
+    Java = @{ OK = $null; Version = ""; Message = "Verificando..." }
+    Minecraft = @{ OK = $null; Message = "Verificando..." }
+    Forge = @{ OK = $null; Version = ""; Message = "Verificando..." }
+    RAM = @{ OK = $null; Total = 0; Message = "Verificando..." }
+    Disk = @{ OK = $null; Free = 0; Message = "Verificando..." }
 }
+$script:ServerStatus = $null  # null = loading, true = online, false = offline
+$script:ChecksReady = $false
 $script:Installing = $false
 
 # ==================== DETECTION ====================
@@ -93,6 +96,26 @@ function Test-SystemRAM {
     }
 }
 
+function Test-DiskSpace {
+    try {
+        $mcPath = $script:Config.MinecraftPath
+        $drive = (Split-Path $mcPath -Qualifier)
+        $disk = Get-PSDrive -Name $drive.TrimEnd(':') -ErrorAction SilentlyContinue
+        if ($disk) {
+            $freeGB = [math]::Round($disk.Free / 1GB, 1)
+            $script:SystemCheck.Disk.Free = $freeGB
+            $script:SystemCheck.Disk.OK = $freeGB -ge 1
+            $script:SystemCheck.Disk.Message = "$freeGB GB libres"
+        } else {
+            $script:SystemCheck.Disk.OK = $true
+            $script:SystemCheck.Disk.Message = "OK"
+        }
+    } catch {
+        $script:SystemCheck.Disk.OK = $true
+        $script:SystemCheck.Disk.Message = "OK"
+    }
+}
+
 function Get-ServerStatus {
     try {
         $tcp = New-Object System.Net.Sockets.TcpClient
@@ -111,6 +134,7 @@ function Invoke-SystemCheck {
     Test-MinecraftInstalled | Out-Null
     Test-ForgeInstalled | Out-Null
     Test-SystemRAM
+    Test-DiskSpace
     Add-Log "Escaneo completado"
 }
 
@@ -530,6 +554,7 @@ $HTML = @"
         .check-item:nth-child(2) { animation-delay: 0.2s; }
         .check-item:nth-child(3) { animation-delay: 0.3s; }
         .check-item:nth-child(4) { animation-delay: 0.4s; }
+        .check-item:nth-child(5) { animation-delay: 0.5s; }
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -604,6 +629,19 @@ $HTML = @"
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 24px;
+            opacity: 0;
+            animation: fadeIn 0.5s ease 0.4s forwards;
+        }
+        .version-section {
+            opacity: 0;
+            animation: fadeIn 0.5s ease 0.2s forwards;
+        }
+        .main-content {
+            animation: fadeSlideIn 0.6s ease forwards;
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
         }
         .progress-header {
             display: flex;
@@ -953,6 +991,13 @@ $HTML = @"
                                 <p id="statusRAM">Verificando...</p>
                             </div>
                         </div>
+                        <div class="check-item" id="checkDisk">
+                            <div class="check-icon loading" id="iconDisk"><i data-feather="hard-drive"></i></div>
+                            <div class="check-info">
+                                <h4>Espacio en Disco</h4>
+                                <p id="statusDisk">Verificando...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -1185,7 +1230,11 @@ $HTML = @"
         function updateIcon(id, ok) {
             var el = document.getElementById(id);
             el.classList.remove('ok', 'warn', 'error', 'loading');
-            el.classList.add(ok ? 'ok' : 'error');
+            if (ok === null) {
+                el.classList.add('loading');
+            } else {
+                el.classList.add(ok ? 'ok' : 'error');
+            }
         }
         
         function updateStatus() {
@@ -1242,6 +1291,11 @@ $HTML = @"
                         
                         updateIcon('iconRAM', d.system.ram.ok);
                         document.getElementById('statusRAM').textContent = d.system.ram.msg;
+                        
+                        if (d.system.disk) {
+                            updateIcon('iconDisk', d.system.disk.ok);
+                            document.getElementById('statusDisk').textContent = d.system.disk.msg;
+                        }
                     }
                     
                     // Log
@@ -1319,12 +1373,19 @@ function Start-Installer {
     Write-Host "  [OK] Abriendo navegador..." -ForegroundColor Green
     Write-Host ""
     
-    Invoke-SystemCheck
-    $serverStatus = Get-ServerStatus
-    
+    # Open browser FIRST (system shows loading state)
     $htmlPath = "$env:TEMP\paisaland_v9.html"
     $HTML.Replace("{{PORT}}", $port) | Out-File -FilePath $htmlPath -Encoding UTF8
     Start-Process $htmlPath
+    
+    # Start delayed system checks in background
+    Start-Job -ScriptBlock {
+        Start-Sleep -Seconds 1
+    } | Wait-Job | Out-Null
+    
+    # Now run checks (UI will update via polling)
+    Invoke-SystemCheck
+    $serverStatus = Get-ServerStatus
     
     while ($listener.IsListening) {
         try {
@@ -1356,6 +1417,7 @@ function Start-Installer {
                             minecraft = @{ ok = $script:SystemCheck.Minecraft.OK; msg = $script:SystemCheck.Minecraft.Message }
                             forge = @{ ok = $script:SystemCheck.Forge.OK; msg = $script:SystemCheck.Forge.Message }
                             ram = @{ ok = $script:SystemCheck.RAM.OK; msg = $script:SystemCheck.RAM.Message }
+                            disk = @{ ok = $script:SystemCheck.Disk.OK; msg = $script:SystemCheck.Disk.Message }
                         }
                     }
                 }
