@@ -1,195 +1,232 @@
 # ==============================================================================================
 # EpicScript - Instalador Automático de Mods para PaisaLand
-# v2.0 - Rediseño Moderno "Launcher Style"
+# v3.0 - ULTIMATE EDITION (WPF + XAML + Animations)
 # ==============================================================================================
 
-Add-Type -AssemblyName System.Windows.Forms
+# --- CARGAR LIBRERÍAS DE WPF ---
+Add-Type -AssemblyName PresentationFramework
+Add-Type -AssemblyName PresentationCore
+Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Drawing
 
 # --- CONFIGURACIÓN ---
 # ¡IMPORTANTE! REEMPLAZA ESTOS LINKS POR LOS TUYOS DE DROPBOX
-# Si terminan en dl=0, el script lo arreglará automáticamente.
 $DownloadUrlLow = "https://www.dropbox.com/scl/fi/0uq96jnx7a3tsfwz79mrg/PC-Gama-Baja.zip?rlkey=oi5am56nw8aihcixj709ksgri&st=id22tog3&dl=0".Replace("dl=0", "dl=1")
 $DownloadUrlHigh = "https://www.dropbox.com/scl/fi/mdqsni1k9ht8fuadv9kzd/PC-Gama-Alta.zip?rlkey=wgn6buj6qrnmxeqjsp03by4k5&st=wr6czevh&dl=0".Replace("dl=0", "dl=1")
-$InstallerTitle = "PaisaLand - Instalador Oficial"
+$InstallerTitle = "PaisaLand - Launcher"
 $MinecraftPath = "$env:APPDATA\.minecraft"
 $TempDir = "$env:TEMP\PaisaLandInstaller"
 
-# --- ESTILO VISUAL (Launcher Theme) ---
-$ColorBgDeep    = [System.Drawing.Color]::FromArgb(30, 30, 30)      # Fondo Principal
-$ColorPanel     = [System.Drawing.Color]::FromArgb(45, 45, 45)      # Paneles
-$ColorGreen     = [System.Drawing.Color]::FromArgb(59, 133, 38)     # Botón Jugar (Normal)
-$ColorGreenHv   = [System.Drawing.Color]::FromArgb(83, 163, 58)     # Botón Jugar (Hover)
-$ColorText      = [System.Drawing.Color]::White
-$ColorSubText   = [System.Drawing.Color]::FromArgb(170, 170, 170)
-$ColorBorder    = [System.Drawing.Color]::FromArgb(60, 60, 60)
+# --- DEFINICIÓN DE LA INTERFAZ XAML (ESTILO VISUAL) ---
+[xml]$XAML = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="$InstallerTitle" Height="550" Width="850"
+        WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterScreen">
 
-$FontTitle      = New-Object System.Drawing.Font("Segoe UI", 24, [System.Drawing.FontStyle]::Bold)
-$FontSubTitle   = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Regular)
-$FontButton     = New-Object System.Drawing.Font("Segoe UI", 14, [System.Drawing.FontStyle]::Bold)
-$FontRadio      = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Regular)
-$FontConsole    = New-Object System.Drawing.Font("Consolas", 9, [System.Drawing.FontStyle]::Regular)
+    <Window.Resources>
+        <!-- COLORES -->
+        <SolidColorBrush x:Key="BgBrush" Color="#121212"/>
+        <SolidColorBrush x:Key="PanelBrush" Color="#1E1E1E"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#3DAE2B"/> <!-- Verde Minecraft -->
+        <SolidColorBrush x:Key="AccentDarkBrush" Color="#2A7A1E"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="SubTextBrush" Color="#AAAAAA"/>
+        
+        <!-- ESTILO BOTÓN PRINCIPAL (ANIMADO) -->
+        <Style x:Key="MainButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="Border" Background="{TemplateBinding Background}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{StaticResource AccentDarkBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Border" Property="Background" Value="#444444"/>
+                                <Setter Property="Foreground" Value="#888888"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-# --- VENTANA PRINCIPAL ---
-$Form = New-Object System.Windows.Forms.Form
-$Form.Text = $InstallerTitle
-$Form.Size = New-Object System.Drawing.Size(800, 500)
-$Form.StartPosition = "CenterScreen"
-$Form.BackColor = $ColorBgDeep
-$Form.FormBorderStyle = "FixedSingle"
-$Form.MaximizeBox = $false
-$Form.Icon = [System.Drawing.SystemIcons]::Application
+        <!-- ESTILO BOTÓN SECUNDARIO -->
+        <Style x:Key="TextButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#AAAAAA"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <TextBlock Text="{TemplateBinding Content}" TextDecorations="Underline" Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-# --- COMPONENTES UI ---
+        <!-- ESTILO RADIO BUTTON (TARJETA) -->
+        <Style x:Key="CardRadioStyle" TargetType="RadioButton">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border Name="Border" Background="#252525" CornerRadius="10" 
+                                BorderBrush="#333333" BorderThickness="2" Padding="15" Margin="0,0,15,0">
+                            <DockPanel>
+                                <Ellipse Name="Dot" Width="10" Height="10" Fill="Transparent" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" DockPanel.Dock="Top" HorizontalAlignment="Right"/>
+                                <StackPanel>
+                                    <TextBlock Text="{TemplateBinding Content}" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
+                                    <TextBlock Name="Desc" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" FontSize="11" Foreground="#AAAAAA" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Border" Property="Background" Value="#1A2E1A"/>
+                                <Setter TargetName="Dot" Property="Fill" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#666666"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
-# 1. Header Hero
-$HeaderPanel = New-Object System.Windows.Forms.Panel
-$HeaderPanel.Size = New-Object System.Drawing.Size(800, 100)
-$HeaderPanel.BackColor = $ColorBgDeep
-$HeaderPanel.Location = New-Object System.Drawing.Point(0, 0)
-$Form.Controls.Add($HeaderPanel)
+    <!-- LAYOUT PRINCIPAL -->
+    <Border CornerRadius="15" Background="{StaticResource BgBrush}" BorderBrush="#333333" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="*"/>    <!-- Content -->
+                <RowDefinition Height="Auto"/> <!-- Footer -->
+            </Grid.RowDefinitions>
 
-$TitleLabel = New-Object System.Windows.Forms.Label
-$TitleLabel.Text = "PAISALAND"
-$TitleLabel.Font = $FontTitle
-$TitleLabel.ForeColor = $ColorText
-$TitleLabel.AutoSize = $true
-$TitleLabel.Location = New-Object System.Drawing.Point(30, 25)
-$HeaderPanel.Controls.Add($TitleLabel)
+            <!-- HEADER / DRAG ZONE -->
+            <Grid Grid.Row="0" Height="90" Background="Transparent" Name="DragZone">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="30,0,0,0">
+                    <TextBlock Text="PAISA" FontSize="32" FontWeight="Black" Foreground="White"/>
+                    <TextBlock Text="LAND" FontSize="32" FontWeight="Black" Foreground="{StaticResource AccentBrush}"/>
+                </StackPanel>
+                
+                <Button Name="BtnClose" Content="✕" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,15,15,0"
+                        Width="30" Height="30" Background="Transparent" Foreground="#666666" BorderThickness="0" FontSize="16" Cursor="Hand"/>
+            </Grid>
 
-$DescLabel = New-Object System.Windows.Forms.Label
-$DescLabel.Text = "INSTALADOR DE MODS"
-$DescLabel.Font = $FontSubTitle
-$DescLabel.ForeColor = $ColorGreen
-$DescLabel.AutoSize = $true
-$DescLabel.Location = New-Object System.Drawing.Point(230, 42)
-$HeaderPanel.Controls.Add($DescLabel)
+            <!-- CONTENIDO -->
+            <StackPanel Grid.Row="1" Margin="30,10,30,0">
+                <TextBlock Text="SELECCIONA TU VERSIÓN" Foreground="#666666" FontSize="12" FontWeight="Bold" Margin="0,0,0,15"/>
 
-# 2. Área de Contenido
-$ContentPanel = New-Object System.Windows.Forms.Panel
-$ContentPanel.Size = New-Object System.Drawing.Size(740, 340)
-$ContentPanel.Location = New-Object System.Drawing.Point(30, 100)
-$ContentPanel.BackColor = $ColorPanel
-$Form.Controls.Add($ContentPanel)
+                <StackPanel Orientation="Horizontal" Height="100">
+                    <RadioButton Name="RadioLow" Content="PC GAMA BAJA" Tag="Optimizado para máximo rendimiento. Sin efectos pesados."
+                                 GroupName="Version" Style="{StaticResource CardRadioStyle}" IsChecked="True" Width="380"/>
+                    
+                    <RadioButton Name="RadioHigh" Content="PC GAMA ALTA" Tag="Gráficos Ultra. Incluye Shaders, Texturas HD y animaciones."
+                                 GroupName="Version" Style="{StaticResource CardRadioStyle}" Width="380"/>
+                </StackPanel>
 
-# Selección de Gama
-$LblSelect = New-Object System.Windows.Forms.Label
-$LblSelect.Text = "SELECCIONA TU VERSIÓN:"
-$LblSelect.ForeColor = $ColorSubText
-$LblSelect.Font = $FontSubTitle
-$LblSelect.AutoSize = $true
-$LblSelect.Location = New-Object System.Drawing.Point(30, 20)
-$ContentPanel.Controls.Add($LblSelect)
+                <TextBlock Text="ESTADO" Foreground="#666666" FontSize="12" FontWeight="Bold" Margin="0,30,0,10"/>
+                
+                <!-- STATUS BAR -->
+                <TextBlock Name="StatusText" Text="Listo para instalar" Foreground="White" FontSize="14" Margin="0,0,0,10"/>
+                <ProgressBar Name="ProgressBar" Height="6" Background="#252525" Foreground="{StaticResource AccentBrush}" BorderThickness="0" Value="0"/>
 
-$RadioLow = New-Object System.Windows.Forms.RadioButton
-$RadioLow.Text = "PC Gama Baja (Optimizado para FPS)"
-$RadioLow.Location = New-Object System.Drawing.Point(50, 60)
-$RadioLow.Size = New-Object System.Drawing.Size(300, 30)
-$RadioLow.Font = $FontRadio
-$RadioLow.ForeColor = [System.Drawing.Color]::LightGreen
-$RadioLow.Checked = $true
-$ContentPanel.Controls.Add($RadioLow)
+                <!-- LOG VISUAL -->
+                <Border Background="#0A0A0A" CornerRadius="5" Height="120" Margin="0,20,0,0" Padding="10">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <TextBlock Name="LogText" Text="Bienvenido al instalador v3.0..." Foreground="#00FF00" FontFamily="Consolas" FontSize="11"/>
+                    </ScrollViewer>
+                </Border>
+            </StackPanel>
 
-$RadioHigh = New-Object System.Windows.Forms.RadioButton
-$RadioHigh.Text = "PC Gama Alta (Texturas + Shaders)"
-$RadioHigh.Location = New-Object System.Drawing.Point(400, 60)
-$RadioHigh.Size = New-Object System.Drawing.Size(300, 30)
-$RadioHigh.Font = $FontRadio
-$RadioHigh.ForeColor = [System.Drawing.Color]::Gold
-$ContentPanel.Controls.Add($RadioHigh)
+            <!-- FOOTER -->
+            <Grid Grid.Row="2" Height="80" Margin="30,0,30,0">
+                <Button Name="BtnBackup" Content="Crear Backup de Seguridad" HorizontalAlignment="Left" Style="{StaticResource TextButtonStyle}"/>
+                <Button Name="BtnInstall" Content="INSTALAR SERVIDOR" Width="220" Height="50" HorizontalAlignment="Right" Style="{StaticResource MainButtonStyle}"/>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
+"@
 
-# Estado y Progreso
-$StatusLabel = New-Object System.Windows.Forms.Label
-$StatusLabel.Text = "Esperando..."
-$StatusLabel.ForeColor = $ColorText
-$StatusLabel.Font = $FontSubTitle
-$StatusLabel.AutoSize = $true
-$StatusLabel.Location = New-Object System.Drawing.Point(30, 120)
-$ContentPanel.Controls.Add($StatusLabel)
+# --- CARGAR XAML ---
+$Reader = (New-Object System.Xml.XmlNodeReader $XAML)
+$Window = [Windows.Markup.XamlReader]::Load($Reader)
 
-$ProgressBar = New-Object System.Windows.Forms.ProgressBar
-$ProgressBar.Location = New-Object System.Drawing.Point(30, 150)
-$ProgressBar.Size = New-Object System.Drawing.Size(680, 20)
-$ProgressBar.Style = "Continuous"
-$ContentPanel.Controls.Add($ProgressBar)
-
-# Terminal (Log) - Más discreta
-$LogBox = New-Object System.Windows.Forms.TextBox
-$LogBox.Multiline = $true
-$LogBox.ReadOnly = $true
-$LogBox.ScrollBars = "Vertical"
-$LogBox.Location = New-Object System.Drawing.Point(30, 190)
-$LogBox.Size = New-Object System.Drawing.Size(680, 130)
-$LogBox.BackColor = [System.Drawing.Color]::Black
-$LogBox.ForeColor = [System.Drawing.Color]::LimeGreen
-$LogBox.BorderStyle = "FixedSingle"
-$LogBox.Font = $FontConsole
-$ContentPanel.Controls.Add($LogBox)
-
-function Log-Message($msg) {
-    $LogBox.AppendText("> $msg`r`n")
-    $LogBox.ScrollToCaret()
-    $Form.Refresh()
+# --- MAPEO DE CONTROLES ---
+$controls = @("RadioLow", "RadioHigh", "BtnInstall", "BtnBackup", "BtnClose", "DragZone", "StatusText", "ProgressBar", "LogText", "ScrollViewer")
+foreach ($ctrlName in $controls) {
+    New-Variable -Name $ctrlName -Value $Window.FindName($ctrlName) -Force
 }
 
-# 3. Footer (Botones)
-$BtnInstall = New-Object System.Windows.Forms.Button
-$BtnInstall.Text = "INSTALAR"
-$BtnInstall.Size = New-Object System.Drawing.Size(250, 60)
-$BtnInstall.Location = New-Object System.Drawing.Point(520, 260) # Dentro del ContentPanel? No, form.
-# Ubicación en Form absolute
-$BtnInstall.Location = New-Object System.Drawing.Point(520, 370)
-$BtnInstall.FlatStyle = "Flat"
-$BtnInstall.ForeColor = $ColorText
-$BtnInstall.BackColor = $ColorGreen
-$BtnInstall.Font = $FontButton
-$BtnInstall.FlatAppearance.BorderSize = 0
-$BtnInstall.Cursor = [System.Windows.Forms.Cursors]::Hand
-# Hover Effects
-$BtnInstall.add_MouseEnter({ param($sender,$e) $sender.BackColor = $ColorGreenHv })
-$BtnInstall.add_MouseLeave({ param($sender,$e) $sender.BackColor = $ColorGreen })
-$Form.Controls.Add($BtnInstall)
+# --- LÓGICA DE MOVIMIENTO DE VENTANA (Drag) ---
+$DragZone.Add_MouseLeftButtonDown({
+    $Window.DragMove()
+})
 
-$BtnBackup = New-Object System.Windows.Forms.Button
-$BtnBackup.Text = "Crear Backup"
-$BtnBackup.Size = New-Object System.Drawing.Size(150, 40)
-$BtnBackup.Location = New-Object System.Drawing.Point(30, 380)
-$BtnBackup.FlatStyle = "Flat"
-$BtnBackup.ForeColor = [System.Drawing.Color]::Gray
-$BtnBackup.BackColor = $ColorBgDeep
-$BtnBackup.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Underline)
-$BtnBackup.FlatAppearance.BorderSize = 0
-$BtnBackup.Cursor = [System.Windows.Forms.Cursors]::Hand
-$Form.Controls.Add($BtnBackup)
+$BtnClose.Add_Click({
+    $Window.Close()
+})
 
+# --- FUNCIONES ---
+function Log-Write($msg) {
+    $script:LogText.Text += "`n> $msg"
+    # Auto-scroll (Hacky in pure PS/WPF logic, but works)
+    $Window.Dispatcher.Invoke([Action]{ $script:LogText.ScrollToEnd() }, "Normal")
+}
 
-# --- LÓGICA DE INSTALACIÓN (Sin cambios funcionales, solo visuales) ---
-$ActionInstall = {
-    $BtnInstall.Enabled = $false
-    $BtnBackup.Enabled = $false
-    $BtnInstall.BackColor = [System.Drawing.Color]::Gray
+# --- ACCIÓN INSTALAR ---
+$BtnInstall.Add_Click({
+    $BtnInstall.IsEnabled = $false
+    $BtnBackup.IsEnabled = $false
+    
+    # Run in simpler async simulation with DoEvents to keep UI responsive-ish
+    # Note: Pure PS async is hard. We will use Dispatcher frames or just careful sync steps.
     
     try {
         $SelectedUrl = ""
-        if ($RadioLow.Checked) { 
+        if ($RadioLow.IsChecked) { 
             $SelectedUrl = $DownloadUrlLow 
-            Log-Message "Versión seleccionada: GAMA BAJA"
+            Log-Write "Modo: GAMA BAJA (Optimizado)"
         } else { 
             $SelectedUrl = $DownloadUrlHigh
-            Log-Message "Versión seleccionada: GAMA ALTA"
+            Log-Write "Modo: GAMA ALTA (Ultra)"
         }
 
         if ($SelectedUrl -match "URL_.*_AQUI" -or $SelectedUrl -eq "") {
-            Log-Message "ERROR: URL no configurada."
-            [System.Windows.Forms.MessageBox]::Show("Falta configurar el link de descarga.", "Error", "OK", "Error")
+            [System.Windows.MessageBox]::Show("URL no configurada.")
             return
         }
 
         # 1. Comprobaciones
-        $StatusLabel.Text = "Verificando Minecraft..."
+        $StatusText.Text = "Buscando carpeta..."
+        Log-Write "Verificando instalación..."
+        [System.Windows.Forms.Application]::DoEvents()
+        Start-Sleep -m 500
+
         if (-not (Test-Path $MinecraftPath)) {
-            Log-Message "Error: No se encontró .minecraft"
-            [System.Windows.Forms.MessageBox]::Show("Abre Minecraft al menos una vez antes de instalar.", "Error", "OK", "Error")
+            [System.Windows.MessageBox]::Show("No se encontró la carpeta .minecraft")
             return
         }
 
@@ -197,32 +234,38 @@ $ActionInstall = {
         $ZipPath = "$TempDir\PaisaLand_Mods.zip"
         if (-not (Test-Path $TempDir)) { New-Item -ItemType Directory -Force -Path $TempDir | Out-Null }
         
-        $StatusLabel.Text = "Descargando contenido..."
-        Log-Message "Iniciando descarga..."
-        
+        $StatusText.Text = "Descargando contenido..."
+        Log-Write "Iniciando descarga desde la nube..."
+        $ProgressBar.IsIndeterminate = $true
+        [System.Windows.Forms.Application]::DoEvents()
+
+        # Descarga Sync (bloquea UI un poco, pero es seguro en PS simple)
         $WebClient = New-Object System.Net.WebClient
-        $ProgressBar.Style = "Marquee"
         $WebClient.DownloadFile($SelectedUrl, $ZipPath)
-        $ProgressBar.Style = "Continuous"
+        
+        $ProgressBar.IsIndeterminate = $false
         $ProgressBar.Value = 40
-        Log-Message "Descarga exitosa."
+        Log-Write "Descarga completada."
+        [System.Windows.Forms.Application]::DoEvents()
 
         # 3. Limpieza
-        $StatusLabel.Text = "Limpiando instalación anterior..."
-        Log-Message "Borrando mods viejos..."
+        $StatusText.Text = "Limpiando mods antiguos..."
+        Log-Write "Eliminando archivos viejos..."
         $ModsPath = "$MinecraftPath\mods"
         if (Test-Path $ModsPath) { Remove-Item "$ModsPath\*" -Recurse -Force -ErrorAction SilentlyContinue }
         
         # 4. Extracción
-        $StatusLabel.Text = "Descomprimiendo..."
-        Log-Message "Extrayendo archivos..."
-        $ProgressBar.Value = 70
+        $StatusText.Text = "Descomprimiendo paquete..."
+        $ProgressBar.Value = 60
+        [System.Windows.Forms.Application]::DoEvents()
         Expand-Archive -LiteralPath $ZipPath -DestinationPath $TempDir -Force
         
         # 5. Instalación
-        $ProgressBar.Value = 90
-        $StatusLabel.Text = "Instalando..."
-        
+        $StatusText.Text = "Instalando archivos..."
+        $ProgressBar.Value = 80
+        Log-Write "Copiando a .minecraft..."
+        [System.Windows.Forms.Application]::DoEvents()
+
         $ExtractedItems = Get-ChildItem -Path $TempDir -Exclude "PaisaLand_Mods.zip"
         if ($ExtractedItems.Count -eq 1 -and $ExtractedItems[0].PSIsContainer) {
             $SourceDir = $ExtractedItems[0].FullName
@@ -230,52 +273,50 @@ $ActionInstall = {
             $SourceDir = $TempDir
         }
 
-        Log-Message "Moviendo archivos a Minecraft..."
         Copy-Item -Path "$SourceDir\*" -Destination $MinecraftPath -Recurse -Force
         
         $ProgressBar.Value = 100
-        $StatusLabel.Text = "¡LISTO PARA JUGAR!"
-        $StatusLabel.ForeColor = $ColorGreen
-        Log-Message "Instalación completada exitosamente."
-        [System.Windows.Forms.MessageBox]::Show("¡Instalación completada! Abre el Launcher y juega.", "PaisaLand", "OK", "Information")
+        $StatusText.Text = "¡INSTALACIÓN COMPLETADA!"
+        $StatusText.Foreground = [System.Windows.Media.Brushes]::LimeGreen
+        Log-Write "¡Todo listo! Cierra esto y abre el juego."
+        [System.Windows.MessageBox]::Show("Instalación exitosa. ¡A jugar!", "PaisaLand", "OK", "Information")
 
     } catch {
-        Log-Message "ERROR: $($_.Exception.Message)"
-        [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", "OK", "Error")
+        Log-Write "ERROR: $($_.Exception.Message)"
+        [System.Windows.MessageBox]::Show("Error: $($_.Exception.Message)")
     } finally {
-        $BtnInstall.Enabled = $true
-        $BtnBackup.Enabled = $true
-        $BtnInstall.BackColor = $ColorGreen
+        $BtnInstall.IsEnabled = $true
+        $BtnBackup.IsEnabled = $true
         if (Test-Path $TempDir) { Remove-Item $TempDir -Recurse -Force -ErrorAction SilentlyContinue }
-        $ProgressBar.Style = "Continuous"
+        $ProgressBar.IsIndeterminate = $false
+        # No reset value so user sees 100%
     }
-}
+})
 
-$ActionBackup = {
+# --- ACCIÓN BACKUP ---
+$BtnBackup.Add_Click({
     try {
         $BackupDir = "$env:USERPROFILE\Desktop\PaisaLand_Backup_$(Get-Date -Format 'yyyyMMdd_HHmm')"
-        $StatusLabel.Text = "Creando Backup..."
-        Log-Message "Guardando copia en el Escritorio..."
-        New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
+        $StatusText.Text = "Realizando Backup..."
+        Log-Write "Guardando copia en Escritorio..."
+        [System.Windows.Forms.Application]::DoEvents()
         
+        New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
         $FoldersToBackup = @("mods", "config", "shaderpacks", "resourcepacks", "emotes", "options.txt", "servers.dat")
+        
         foreach ($item in $FoldersToBackup) {
             $itemPath = "$MinecraftPath\$item"
             if (Test-Path $itemPath) {
                 Copy-Item -Path $itemPath -Destination $BackupDir -Recurse
             }
         }
-        Log-Message "Backup guardado: $BackupDir"
-        $StatusLabel.Text = "Backup Completado"
-        [System.Windows.Forms.MessageBox]::Show("Backup guardado en tu Escritorio.", "Backup", "OK", "Information")
+        Log-Write "Backup guardado: $BackupDir"
+        $StatusText.Text = "Backup Finalizado"
+        [System.Windows.MessageBox]::Show("Backup creado en el Escritorio.", "Backup", "OK", "Information")
     } catch {
-        Log-Message "Error Backup: $($_.Exception.Message)"
+        Log-Write "Error Backup: $($_.Exception.Message)"
     }
-}
+})
 
-$BtnInstall.add_Click($ActionInstall)
-$BtnBackup.add_Click($ActionBackup)
-
-# --- MOSTRAR ---
-$Form.Add_Shown({ $Form.Activate() })
-[void] $Form.ShowDialog()
+# --- INICIAR ---
+[void]$Window.ShowDialog()
