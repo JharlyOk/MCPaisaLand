@@ -467,6 +467,7 @@ $HTML = @"
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PaisaLand Installer</title>
+    <link rel="icon" type="image/png" href="https://i.imgur.com/12N1q3o.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
     <style>
@@ -1118,7 +1119,7 @@ $HTML = @"
         <!-- Footer -->
         <footer class="footer">
             <div class="footer-left">
-                Creado por <a href="https://github.com/JharlyOk" target="_blank">JharlyOk</a> para la comunidad PaisaLand
+                Creado por con ❤️ por <a href="https://github.com/JharlyOk" target="_blank">JharlyOk</a> para la comunidad PaisaLand.
             </div>
             <div class="footer-right">
                 <span class="footer-version">v9.0.0</span>
@@ -1154,7 +1155,7 @@ $HTML = @"
     <div class="modal-overlay" id="backupOverlay" onclick="closeBackupWarning()">
         <div class="modal" onclick="event.stopPropagation()">
             <div class="modal-icon warn"><i data-feather="alert-circle"></i></div>
-            <h2>&#9888; Precauci&oacute;n</h2>
+            <h2>Precauci&oacute;n</h2>
             <p>La instalaci&oacute;n eliminar&aacute; tus mods, shaders y configuraciones actuales.<br><br>&iquest;Deseas hacer una copia de seguridad antes de continuar?</p>
             <div style="display: flex; gap: 12px; margin-top: 20px; flex-direction: column;">
                 <button class="btn-action" onclick="installWithBackup()" style="justify-content: center; background: linear-gradient(135deg, var(--green), var(--green2)); border:none; color:white;">
