@@ -9,7 +9,7 @@ $script:Config = @{
     MinecraftVersion = "1.20.1"
     ForgeVersion = "47.2.0"
     DownloadUrlLow = "https://www.dropbox.com/scl/fi/69wsenz4v9xqb8xh77zcn/PC-Gama-Baja.zip?rlkey=ww42naweab8jss8rc73sga2bo&st=489vgqes&dl=1"
-    DownloadUrlHigh = "https://www.dropbox.com/scl/fi/qskq2go30stq0avsl5vcl/PC-Gama-Alta.zip?rlkey=v54szrn1yoy8gtgpxch430ruo&st=qndnmf3w&dl=1"
+    DownloadUrlHigh = "https://www.dropbox.com/scl/fi/xzpe3la212x3ezplvrvlm/PC-Gama-Alta.zip?rlkey=76u4pl3jt25mquqqq81aa8srs&st=jvacnabh&dl=1"
     ForgeInstallerUrl = "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-installer.jar"
     ServerIP = "199.127.62.118"
     ServerPort = 25610
