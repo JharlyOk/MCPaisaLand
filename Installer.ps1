@@ -988,7 +988,7 @@ $HTML = @"
     <div class="app">
         <header class="header">
             <div class="brand">
-                <img src="https://i.ibb.co/3ykD2qR/Logo.png" alt="Logo" class="brand-icon" style="background:none; box-shadow:none; padding:0;">
+                <img src="https://i.imgur.com/12N1q3o.png" alt="Logo" class="brand-icon" style="background:none; box-shadow:none; padding:0;">
                 <h1>PAISA<span>LAND</span></h1>
             </div>
             <div style="display:flex;align-items:center;gap:12px;">
@@ -1146,6 +1146,24 @@ $HTML = @"
             <div style="display: flex; gap: 12px; margin-top: 20px;">
                 <button class="modal-close" onclick="closeConfirm()" style="flex: 1; padding: 14px;">Cancelar</button>
                 <button class="btn-danger" onclick="confirmUninstall()" style="flex: 1; padding: 14px; background: linear-gradient(135deg, #ef4444, #dc2626); border: none; border-radius: 10px; color: white; font-size: 14px; font-weight: 600; cursor: pointer;">Eliminar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Backup Warning Modal -->
+    <div class="modal-overlay" id="backupOverlay" onclick="closeBackupWarning()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-icon warn"><i data-feather="alert-circle"></i></div>
+            <h2>&#9888; Precauci&oacute;n</h2>
+            <p>La instalaci&oacute;n eliminar&aacute; tus mods, shaders y configuraciones actuales.<br><br>&iquest;Deseas hacer una copia de seguridad antes de continuar?</p>
+            <div style="display: flex; gap: 12px; margin-top: 20px; flex-direction: column;">
+                <button class="btn-action" onclick="installWithBackup()" style="justify-content: center; background: linear-gradient(135deg, var(--green), var(--green2)); border:none; color:white;">
+                    <i data-feather="save"></i> Hacer Backup y Continuar
+                </button>
+                <button class="btn-action" onclick="startInstall()" style="justify-content: center; background: var(--bg3); border:1px solid var(--border);">
+                    <i data-feather="arrow-right"></i> Instalar sin Backup
+                </button>
+                 <button class="modal-close" onclick="closeBackupWarning()" style="width:100%">Cancelar</button>
             </div>
         </div>
     </div>
@@ -1396,6 +1414,12 @@ $HTML = @"
         }
         
         function install() {
+             showBackupWarning();
+        }
+
+        // Actual install logic
+        function startInstall() {
+            closeBackupWarning();
             var btn = document.getElementById('btnInstall');
             isLocalProcessing = true;
             btn.innerHTML = '<i data-feather="loader"></i><span>Instalando, espere...</span>';
@@ -1416,10 +1440,32 @@ $HTML = @"
             isLocalProcessing = true;
             showToast('Creando backup...', 'success');
             setAllButtonsDisabled(true);
-            fetch(API + '/backup', { method: 'POST' })
+            return fetch(API + '/backup', { method: 'POST' })
                 .then(function() { showToast('Backup guardado en Escritorio', 'success'); })
                 .catch(function() {})
                 .finally(function() { isLocalProcessing = false; setAllButtonsDisabled(false); });
+        }
+
+        function installWithBackup() {
+            closeBackupWarning();
+            // Manually disable buttons as backup() will re-enable them, 
+            // but we want them disabled until install starts.
+            // However, backup() is async and re-enables in finally.
+            // We can just run backup, and ONCE it finishes, run install.
+            // The flicker is negligible or we can accept it.
+            backup().then(function() {
+                // Wait small delay to ensure UI updates then start install
+                setTimeout(startInstall, 500);
+            });
+        }
+
+        function showBackupWarning() {
+            document.getElementById('backupOverlay').classList.add('show');
+            feather.replace();
+        }
+
+        function closeBackupWarning() {
+            document.getElementById('backupOverlay').classList.remove('show');
         }
         
         function launch() {
