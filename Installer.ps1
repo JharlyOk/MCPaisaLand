@@ -527,14 +527,11 @@ $HTML = @"
         }
         .brand-icon {
             width: 50px; height: 50px;
-            background: linear-gradient(135deg, var(--green), var(--green2));
             border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-            font-weight: 800;
-            box-shadow: 0 0 30px rgba(16,185,129,0.3);
+            object-fit: contain;
         }
         .brand h1 {
             font-size: 26px;
@@ -991,7 +988,7 @@ $HTML = @"
     <div class="app">
         <header class="header">
             <div class="brand">
-                <div class="brand-icon">P</div>
+                <img src="https://i.ibb.co/3ykD2qR/Logo.png" alt="Logo" class="brand-icon" style="background:none; box-shadow:none; padding:0;">
                 <h1>PAISA<span>LAND</span></h1>
             </div>
             <div style="display:flex;align-items:center;gap:12px;">
