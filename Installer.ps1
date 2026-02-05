@@ -1062,6 +1062,9 @@ $HTML = @"
                 <div class="sidebar-card">
                     <h3>Acciones Rapidas</h3>
                     <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button class="btn-action" onclick="showGuide()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px; background: var(--bg3); border:1px solid var(--border);">
+                            <i data-feather="book-open"></i> Guia de Instalacion
+                        </button>
                         <button class="btn-action" onclick="backup()" style="width:100%; justify-content: flex-start; gap: 12px; padding: 14px 16px;">
                             <i data-feather="save"></i> Crear Backup
                         </button>
@@ -1119,7 +1122,7 @@ $HTML = @"
         <!-- Footer -->
         <footer class="footer">
             <div class="footer-left">
-                Creado por con ❤️ por <a href="https://github.com/JharlyOk" target="_blank">JharlyOk</a> para la comunidad PaisaLand.
+                Creado por con &#10084; por <a href="https://github.com/JharlyOk" target="_blank">JharlyOk</a> para la comunidad PaisaLand.
             </div>
             <div class="footer-right">
                 <span class="footer-version">v9.0.0</span>
@@ -1468,6 +1471,14 @@ $HTML = @"
         function closeBackupWarning() {
             document.getElementById('backupOverlay').classList.remove('show');
         }
+
+        function showGuide() {
+            document.getElementById('guideOverlay').classList.add('show');
+        }
+
+        function closeGuide() {
+            document.getElementById('guideOverlay').classList.remove('show');
+        }
         
         function launch() {
             showToast('Abriendo Minecraft...', 'success');
@@ -1504,6 +1515,47 @@ $HTML = @"
         setInterval(updateStatus, 300);
         updateStatus();
     </script>
+    <!-- Guide Modal -->
+    <div class="modal-overlay" id="guideOverlay" onclick="closeGuide()">
+        <div class="modal" onclick="event.stopPropagation()" style="width: 100%; max-width: 600px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="margin:0;">Guia de Instalacion</h2>
+                <div onclick="closeGuide()" style="cursor:pointer;"><i data-feather="x"></i></div>
+            </div>
+            
+            <div class="guide-steps" style="display:flex; flex-direction:column; gap:20px; max-height: 60vh; overflow-y:auto; padding-right:10px;">
+                
+                <div class="guide-step">
+                    <h3 style="color:var(--green); margin-bottom:10px;">1. Instalar Launcher</h3>
+                    <p style="font-size:14px; color:var(--text2); line-height:1.5;">Si aun no tienes Minecraft, necesitas un launcher. Recomendamos TLauncher (gratis) o el Launcher Oficial (si tienes cuenta).</p>
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <a href="https://tlauncher.org/en/" target="_blank" class="btn-action" style="text-decoration:none; height:auto; padding:8px 12px; font-size:13px;">Descargar TLauncher</a>
+                        <a href="https://www.minecraft.net/en-us/download" target="_blank" class="btn-action" style="text-decoration:none; height:auto; padding:8px 12px; font-size:13px; background:var(--bg3);">Launcher Oficial</a>
+                    </div>
+                </div>
+
+                <div class="guide-step">
+                    <h3 style="color:var(--green); margin-bottom:10px;">2. Instalar Java y Forge</h3>
+                    <p style="font-size:14px; color:var(--text2); line-height:1.5;">Necesitas <strong>Forge 1.20.1 (47.2.0)</strong>. Si no lo tienes, descargalo e instalalo (selecciona "Install Client").</p>
+                    <div style="margin-top:10px;">
+                        <a href="https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-installer.jar" target="_blank" class="btn-action" style="text-decoration:none; height:auto; padding:8px 12px; font-size:13px;">Descargar Forge 1.20.1</a>
+                    </div>
+                </div>
+
+                <div class="guide-step">
+                    <h3 style="color:var(--green); margin-bottom:10px;">3. Usar este Instalador</h3>
+                    <p style="font-size:14px; color:var(--text2); line-height:1.5;">En la pantalla principal, selecciona tu version (Gama Alta o Baja) y haz clic en <strong>"Instalar Modpack"</strong>. El programa hara todo por ti.</p>
+                </div>
+
+                <div class="guide-step">
+                    <h3 style="color:var(--green); margin-bottom:10px;">4. Abrir Minecraft</h3>
+                    <p style="font-size:14px; color:var(--text2); line-height:1.5;">Abre tu launcher y asegurate de seleccionar la version <strong>"release 1.20.1-forge-47.2.0"</strong> antes de jugar.</p>
+                </div>
+            </div>
+
+            <button class="modal-close" onclick="closeGuide()" style="margin-top:20px; width:100%;">Entendido</button>
+        </div>
+    </div>
 </body>
 </html>
 "@
