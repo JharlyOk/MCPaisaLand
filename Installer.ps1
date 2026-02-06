@@ -122,7 +122,7 @@ function Get-ServerStatus {
         $ar = $tcp.BeginConnect($script:Config.ServerIP, $script:Config.ServerPort, $null, $null)
         if ($ar.AsyncWaitHandle.WaitOne(2000, $false) -and $tcp.Connected) { 
             $tcp.Close()
-            return @{ Online = $true; Message = "Online - $($script:Config.ServerIP)" } 
+            return @{ Online = $true; Message = "Online" } 
         }
         return @{ Online = $false; Message = "Offline" }
     } catch { return @{ Online = $false; Message = "Error" } }
@@ -486,16 +486,24 @@ $HTML = @"
             --red: #ef4444;
             --yellow: #f59e0b;
             --blue: #3b82f6;
+            /* Tooltip vars: Inverted for high contrast */
+            --tooltip-bg: rgba(255, 255, 255, 0.95);
+            --tooltip-text: #111;
+            --tooltip-border: rgba(0,0,0,0.1);
         }
         body.light {
-            --bg1: #f5f7fa;
+            --bg1: #f8fafc;
             --bg2: #ffffff;
-            --bg3: #eef1f5;
+            --bg3: #f1f5f9;
             --card: rgba(0,0,0,0.02);
-            --border: rgba(0,0,0,0.08);
-            --text1: #1a1a2e;
-            --text2: rgba(0,0,0,0.7);
-            --text3: rgba(0,0,0,0.5);
+            --border: #e2e8f0;
+            --text1: #0f172a;
+            --text2: #475569;
+            --text3: #94a3b8;
+            /* Tooltip vars: Dark for light mode */
+            --tooltip-bg: rgba(20, 20, 20, 0.95);
+            --tooltip-text: #fff;
+            --tooltip-border: rgba(255,255,255,0.1);
         }
         body {
             font-family: 'Inter', sans-serif;
@@ -503,6 +511,7 @@ $HTML = @"
             min-height: 100vh;
             color: var(--text1);
             overflow-x: hidden;
+            overflow-y: scroll; /* Force scrollbar to prevent layout shift */
         }
         
         /* Layout */
@@ -550,7 +559,8 @@ $HTML = @"
             font-size: 13px;
             color: var(--text2);
             opacity: 0;
-            animation: fadeIn 0.4s ease 0.3s forwards;
+            opacity: 0;
+            animation: fadeIn 0.5s ease forwards;
         }
         @keyframes fadeIn {
             to { opacity: 1; }
@@ -561,6 +571,20 @@ $HTML = @"
             background: var(--red);
         }
         .server-dot.online { background: var(--green); box-shadow: 0 0 10px var(--green); }
+        
+        .server-text {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .server-text.masked {
+            filter: blur(5px);
+            opacity: 0.7;
+            user-select: none;
+        }
+        .server-text.masked:hover {
+            opacity: 1;
+            filter: blur(4px);
+        }
         
         /* Main Grid */
         .main-grid {
@@ -580,6 +604,17 @@ $HTML = @"
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 20px;
+            opacity: 0;
+            animation: fadeInUp 0.5s ease forwards;
+        }
+        /* Stagger for sidebar cards */
+        .sidebar-card:nth-child(1) { animation-delay: 0.2s; }
+        .sidebar-card:nth-child(2) { animation-delay: 0.3s; }
+        
+        /* Define fadeInUp globally if not already */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .sidebar-card h3 {
             font-size: 11px;
@@ -604,15 +639,13 @@ $HTML = @"
             background: var(--bg3);
             border-radius: 10px;
             cursor: pointer;
+            border-radius: 10px;
+            cursor: pointer;
             transition: all 0.2s;
-            opacity: 0;
             animation: fadeInUp 0.4s ease forwards;
         }
-        .check-item:nth-child(1) { animation-delay: 0.1s; }
-        .check-item:nth-child(2) { animation-delay: 0.2s; }
-        .check-item:nth-child(3) { animation-delay: 0.3s; }
-        .check-item:nth-child(4) { animation-delay: 0.4s; }
-        .check-item:nth-child(5) { animation-delay: 0.5s; }
+        /* Removed item-level animations */
+        /* .check-item:nth-child... */
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -688,19 +721,16 @@ $HTML = @"
             border-radius: 16px;
             padding: 24px;
             opacity: 0;
-            animation: fadeIn 0.5s ease 0.4s forwards;
+            animation: fadeInUp 0.5s ease 0.3s forwards;
         }
         .version-section {
             opacity: 0;
-            animation: fadeIn 0.5s ease 0.2s forwards;
+            animation: fadeInUp 0.5s ease 0.2s forwards;
         }
         .main-content {
-            animation: fadeSlideIn 0.6s ease forwards;
+            /* No animation on container, let children animate */
         }
-        @keyframes fadeSlideIn {
-            from { opacity: 0; transform: translateX(20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
+        /* Removed fadeSlideIn, using fadeInUp globally */
         .progress-header {
             display: flex;
             justify-content: space-between;
@@ -777,10 +807,11 @@ $HTML = @"
         
         /* Log */
         .log-section {
-            background: var(--bg2);
             border: 1px solid var(--border);
             border-radius: 16px;
             overflow: hidden;
+            opacity: 0;
+            animation: fadeInUp 0.5s ease 0.4s forwards;
         }
         .log-header {
             padding: 14px 20px;
@@ -871,6 +902,58 @@ $HTML = @"
         }
         .modal-close:hover { background: var(--bg3); }
         
+        /* Custom Tooltip */
+        #tooltip {
+            position: fixed;
+            background: var(--tooltip-bg);
+            color: var(--tooltip-text);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 99999;
+            border: 1px solid var(--tooltip-border);
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transform: translate(-50%, -10px) scale(0.95);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #tooltip.show { 
+            opacity: 1; 
+            transform: translate(-50%, -100%) scale(1);
+        }
+        /* Arrow */
+        #tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -6px;
+            border-width: 6px;
+            border-style: solid;
+            border-color: var(--tooltip-bg) transparent transparent transparent;
+        }
+        
+        /* Mobile Repairs */
+        @media (max-width: 600px) {
+            .header { flex-direction: column; align-items: flex-start; gap: 20px; }
+            .brand { width: 100%; justify-content: space-between; }
+            .server-badge { width: 100%; justify-content: center; }
+            /* Truncate IP on mobile or hide if too long */
+            #serverIp { 
+                max-width: 150px; 
+                overflow: hidden; 
+                text-overflow: ellipsis; 
+                white-space: nowrap; 
+                display: inline-block; 
+                vertical-align: bottom;
+            }
+            .main-grid { grid-template-columns: 1fr; }
+            .sidebar { order: 2; }
+        }
+        
         /* Toast */
         .toast {
             position: fixed;
@@ -908,6 +991,8 @@ $HTML = @"
             align-items: center;
             justify-content: center;
             transition: all 0.2s;
+            opacity: 0;
+            animation: fadeIn 0.5s ease forwards;
         }
         .theme-btn:hover { background: var(--bg3); color: var(--text1); }
         
@@ -921,12 +1006,38 @@ $HTML = @"
             border: 1px solid var(--border);
             border-radius: 14px;
             margin-bottom: 24px;
+            position: relative; /* For absolute close button */
+            align-items: flex-start; /* Align top for long text */
+            opacity: 0;
+            animation: fadeInUp 0.5s ease 0.1s forwards;
         }
         .welcome-banner.hidden { 
-            animation: fadeOut 0.3s ease forwards;
+            animation: bannerClose 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
         }
-        @keyframes fadeOut {
-            to { opacity: 0; transform: translateY(-10px); max-height: 0; padding: 0; margin: 0; border: 0; overflow: hidden; }
+        @keyframes bannerClose {
+            0% { 
+                opacity: 1; 
+                transform: scale(1);
+                max-height: 200px; 
+                margin-bottom: 24px;
+                padding: 16px 20px;
+                border: 1px solid var(--border);
+            }
+            30% {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            100% { 
+                opacity: 0; 
+                transform: scale(0.9);
+                max-height: 0; 
+                margin-bottom: 0; 
+                padding: 0 20px; /* Keep horizontal padding to prevent text squish, reduce vertical */
+                padding-top: 0;
+                padding-bottom: 0;
+                border: 0 solid transparent;
+                margin-top: 0;
+            }
         }
         .welcome-icon {
             width: 40px; height: 40px;
@@ -978,10 +1089,17 @@ $HTML = @"
         }
         
         /* Responsive */
+        /* Responsive */
         @media (max-width: 768px) {
+            .header { flex-direction: column; gap: 16px; align-items: center; }
+            .brand { width: auto; justify-content: center; }
+            .server-badge { width: 100%; justify-content: center; }
             .main-grid { grid-template-columns: 1fr; }
             .sidebar { order: 2; }
-            .welcome-banner { flex-direction: column; text-align: center; }
+            /* Banner stays row but responsive */
+            .welcome-banner { padding: 16px; }
+            .welcome-icon { width: 32px; height: 32px; }
+            .welcome-content h3 { font-size: 13px; }
         }
     </style>
 </head>
@@ -993,11 +1111,13 @@ $HTML = @"
                 <h1>PAISA<span>LAND</span></h1>
             </div>
             <div style="display:flex;align-items:center;gap:12px;">
-                <div class="server-badge">
+                <div class="server-badge" onclick="toggleServerIp()" style="cursor: pointer;" data-title="Clic para ver IP">
                     <div class="server-dot" id="serverDot"></div>
-                    <span id="serverText">Verificando...</span>
+                    <span id="serverStatus">Verificando...</span>
+                    <span id="serverSep" style="display:none;">- </span>
+                    <span id="serverIp" class="server-text masked" style="font-family: monospace;"></span>
                 </div>
-                <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Cambiar tema">
+                <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" data-title="Cambiar tema">
                     <i data-feather="moon"></i>
                 </button>
             </div>
@@ -1006,11 +1126,13 @@ $HTML = @"
         <!-- Welcome Guide -->
         <div class="welcome-banner" id="welcomeBanner">
             <div class="welcome-icon"><i data-feather="info"></i></div>
-            <div class="welcome-content">
+            <div class="welcome-content" style="padding-right: 20px;">
                 <h3>Bienvenido al Instalador de PaisaLand</h3>
                 <p>Sigue estos pasos: <strong>1.</strong> Verifica que todo este en verde a la izquierda <strong>2.</strong> Selecciona tu version <strong>3.</strong> Haz clic en Instalar</p>
             </div>
-            <button class="welcome-close" onclick="closeWelcome()"><i data-feather="x"></i></button>
+            <button onclick="closeWelcome()" style="background:none; border:none; color:var(--text2); cursor:pointer; position:absolute; top:10px; right:10px; z-index:10; width:30px; height:30px; display:flex; align-items:center; justify-content:center; padding:0;">
+                <i data-feather="x" style="width:20px; height:20px;"></i>
+            </button>
         </div>
         
         <div class="main-grid">
@@ -1363,10 +1485,21 @@ $HTML = @"
                         feather.replace();
                     }
                     
-                    // Server
                     if (d.server) {
                         document.getElementById('serverDot').classList.toggle('online', d.server.online);
-                        document.getElementById('serverText').textContent = d.server.msg;
+                        document.getElementById('serverStatus').textContent = d.server.msg;
+                        // Only show IP if online
+                        var ipEl = document.getElementById('serverIp');
+                        var sepEl = document.getElementById('serverSep');
+                        if (d.server.online) {
+                            var fullAddr = d.server.ip + (d.server.port ? ':' + d.server.port : '');
+                            ipEl.textContent = fullAddr;
+                            ipEl.style.display = 'inline';
+                            sepEl.style.display = 'inline';
+                        } else {
+                            ipEl.style.display = 'none';
+                            sepEl.style.display = 'none';
+                        }
                     }
                     
                     // System checks
@@ -1472,6 +1605,25 @@ $HTML = @"
             document.getElementById('backupOverlay').classList.remove('show');
         }
 
+        function toggleServerIp() {
+            var el = document.getElementById('serverIp');
+            var badge = document.querySelector('.server-badge');
+            
+            if (el.classList.contains('masked')) {
+                el.classList.remove('masked');
+                showToast('IP visible', 'success');
+                badge.setAttribute('data-title', 'Clic para copiar IP');
+                // Force update if tooltip is currently showing
+                var tip = document.getElementById('tooltip');
+                if (tip.classList.contains('show')) {
+                    tip.textContent = 'Clic para copiar IP';
+                }
+            } else {
+                navigator.clipboard.writeText(el.textContent);
+                showToast('IP copiada al portapapeles', 'success');
+            }
+        }
+
         function showGuide() {
             document.getElementById('guideOverlay').classList.add('show');
         }
@@ -1522,9 +1674,7 @@ $HTML = @"
                 <h2 style="margin:0;">Guia de Instalacion</h2>
                 <div onclick="closeGuide()" style="cursor:pointer;"><i data-feather="x"></i></div>
             </div>
-            
             <div class="guide-steps" style="display:flex; flex-direction:column; gap:20px; max-height: 60vh; overflow-y:auto; padding-right:10px;">
-                
                 <div class="guide-step">
                     <h3 style="color:var(--green); margin-bottom:10px;">1. Instalar Launcher</h3>
                     <p style="font-size:14px; color:var(--text2); line-height:1.5;">Si aun no tienes Minecraft, necesitas un launcher. Recomendamos TLauncher (gratis) o el Launcher Oficial (si tienes cuenta).</p>
@@ -1533,7 +1683,6 @@ $HTML = @"
                         <a href="https://www.minecraft.net/en-us/download" target="_blank" class="btn-action" style="text-decoration:none; height:auto; padding:8px 12px; font-size:13px; background:var(--bg3);">Launcher Oficial</a>
                     </div>
                 </div>
-
                 <div class="guide-step">
                     <h3 style="color:var(--green); margin-bottom:10px;">2. Instalar Java y Forge</h3>
                     <p style="font-size:14px; color:var(--text2); line-height:1.5;">Necesitas <strong>Forge 1.20.1 (47.2.0)</strong>. Si no lo tienes, descargalo e instalalo (selecciona "Install Client").</p>
@@ -1541,12 +1690,10 @@ $HTML = @"
                         <a href="https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.2.0/forge-1.20.1-47.2.0-installer.jar" target="_blank" class="btn-action" style="text-decoration:none; height:auto; padding:8px 12px; font-size:13px;">Descargar Forge 1.20.1</a>
                     </div>
                 </div>
-
                 <div class="guide-step">
                     <h3 style="color:var(--green); margin-bottom:10px;">3. Usar este Instalador</h3>
                     <p style="font-size:14px; color:var(--text2); line-height:1.5;">En la pantalla principal, selecciona tu version (Gama Alta o Baja) y haz clic en <strong>"Instalar Modpack"</strong>. El programa hara todo por ti.</p>
                 </div>
-
                 <div class="guide-step">
                     <h3 style="color:var(--green); margin-bottom:10px;">4. Abrir Minecraft</h3>
                     <p style="font-size:14px; color:var(--text2); line-height:1.5;">Abre tu launcher y asegurate de seleccionar la version <strong>"release 1.20.1-forge-47.2.0"</strong> antes de jugar.</p>
@@ -1556,6 +1703,59 @@ $HTML = @"
             <button class="modal-close" onclick="closeGuide()" style="margin-top:20px; width:100%;">Entendido</button>
         </div>
     </div>
+
+    <!-- Custom Tooltip Element -->
+    <div id="tooltip"></div>
+
+    <script>
+    // Tooltip Logic
+    function initTooltips() {
+        var targets = document.querySelectorAll('[data-title]');
+        var tip = document.getElementById('tooltip');
+        
+        for (var i = 0; i < targets.length; i++) {
+            (function(target) {
+                target.addEventListener('mouseenter', function() {
+                    var text = target.getAttribute('data-title');
+                    if (!text) return;
+                    
+                    tip.textContent = text;
+                    tip.classList.add('show');
+                    
+                    // Static Position
+                    var rect = target.getBoundingClientRect();
+                    // Center horizontal, Top vertical (minus gap)
+                    var left = rect.left + (rect.width / 2);
+                    var top = rect.top - 12; // 12px gap above element
+                    
+                    // Edge detection (prevent overflow)
+                    var tipWidth = tip.offsetWidth;
+                    if (left - (tipWidth / 2) < 10) { // Too far left
+                        left = (tipWidth / 2) + 10;
+                    } else if (left + (tipWidth / 2) > window.innerWidth - 10) { // Too far right
+                        left = window.innerWidth - (tipWidth / 2) - 10;
+                    }
+
+                    tip.style.left = left + 'px';
+                    tip.style.top = top + 'px';
+                });
+                
+                target.addEventListener('mouseleave', function() {
+                    tip.classList.remove('show');
+                });
+                
+                // Update on click (e.g. for IP copy)
+                target.addEventListener('click', function() {
+                     var newText = target.getAttribute('data-title');
+                     if (newText) tip.textContent = newText;
+                });
+            })(targets[i]);
+        }
+    }
+    
+    // Initialize
+    initTooltips();
+    </script>
 </body>
 </html>
 "@
@@ -1619,7 +1819,7 @@ function Start-Installer {
                         log = $script:Status.Log
                         installing = $script:Installing
                         phase = $script:Status.Phase
-                        server = @{ online = $serverStatus.Online; msg = $serverStatus.Message }
+                        server = @{ online = $serverStatus.Online; msg = $serverStatus.Message; ip = $script:Config.ServerIP; port = $script:Config.ServerPort }
                         system = @{
                             java = @{ ok = $script:SystemCheck.Java.OK; msg = $script:SystemCheck.Java.Message }
                             minecraft = @{ ok = $script:SystemCheck.Minecraft.OK; msg = $script:SystemCheck.Minecraft.Message }
